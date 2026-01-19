@@ -32,11 +32,10 @@ function extractNameFromEmail(email: string | null | undefined): string {
   return namePart.charAt(0).toUpperCase() + namePart.slice(1);
 }
 
-function formatCurrency(value: number): string {
-  return `৳${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { useCurrency } from "@/contexts/currency-context";
 
 export function DashboardView({ onNavigate }: DashboardViewProps) {
+  const { formatPrice } = useCurrency();
   const supabase = createClient();
   const [stats, setStats] = useState<{
     totalIncome: number;
@@ -129,11 +128,11 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   ? "text-emerald-700 dark:text-emerald-400"
                   : "text-destructive"
               }`}>
-                {formatCurrency(stats.netBalance)}
+                {formatPrice(stats.netBalance)}
               </span>
             </div>
             <p className="text-xs text-muted-foreground">
-              Income: {formatCurrency(stats.totalIncome)} | Expense: {formatCurrency(stats.totalExpenses)}
+              Income: {formatPrice(stats.totalIncome)} | Expense: {formatPrice(stats.totalExpenses)}
             </p>
           </CardContent>
         </Card>
@@ -218,7 +217,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                       ? "text-emerald-700 dark:text-emerald-400"
                       : "text-foreground"
                   }`}>
-                    {t.transaction_type === "income" ? "+" : ""}{formatCurrency(t.amount)}
+                    {t.transaction_type === "income" ? "+" : ""}{formatPrice(t.amount)}
                   </span>
                 </li>
               ))}

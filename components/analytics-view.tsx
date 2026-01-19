@@ -6,11 +6,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { fetchAnalyticsData, type AnalyticsData } from "@/lib/analytics-store";
 import { format } from "date-fns";
+import { useCurrency } from "@/contexts/currency-context";
 
 const WARNING_THRESHOLD = 500; // Highlight bars above this amount in red
 
 // Custom tooltip for bar chart
-const BarChartTooltip = ({ active, payload }: any) => {
+const BarChartTooltip = ({ active, payload, formatPrice }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -19,7 +20,7 @@ const BarChartTooltip = ({ active, payload }: any) => {
           {format(new Date(data.date), "MMM d")}
         </p>
         <p className="text-sm text-muted-foreground">
-          Amount: <span className="font-semibold text-foreground">${data.amount.toFixed(2)}</span>
+          Amount: <span className="font-semibold text-foreground">{formatPrice(data.amount)}</span>
         </p>
       </div>
     );
@@ -28,14 +29,14 @@ const BarChartTooltip = ({ active, payload }: any) => {
 };
 
 // Custom tooltip for pie chart
-const PieChartTooltip = ({ active, payload }: any) => {
+const PieChartTooltip = ({ active, payload, formatPrice }: any) => {
   if (active && payload && payload.length) {
     const data = payload[0];
     return (
       <div className="rounded-lg border border-border bg-card p-3 shadow-lg">
         <p className="text-sm font-medium text-foreground">{data.name}</p>
         <p className="text-sm text-muted-foreground">
-          Amount: <span className="font-semibold text-foreground">${data.value.toFixed(2)}</span>
+          Amount: <span className="font-semibold text-foreground">{formatPrice(data.value)}</span>
         </p>
         <p className="text-sm text-muted-foreground">
           Percentage: <span className="font-semibold text-foreground">{data.payload.percentage.toFixed(1)}%</span>
@@ -48,6 +49,7 @@ const PieChartTooltip = ({ active, payload }: any) => {
 
 
 export function AnalyticsView() {
+  const { formatPrice, currencySymbol } = useCurrency();
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -149,13 +151,13 @@ export function AnalyticsView() {
                     <Cell key={`cell-${index}`} fill={entry.fill} />
                   ))}
                 </Pie>
-                <Tooltip content={<PieChartTooltip />} />
+                <Tooltip content={<PieChartTooltip formatPrice={formatPrice} />} />
                 <Legend
                   verticalAlign="bottom"
                   height={36}
                   formatter={(value, entry: any) => (
                     <span style={{ color: "hsl(var(--foreground))", fontSize: "12px" }}>
-                      {value} - ${entry.payload.value.toFixed(2)}
+                      {value} - {formatPrice(entry.payload.value)}
                     </span>
                   )}
                   iconType="circle"
@@ -167,7 +169,7 @@ export function AnalyticsView() {
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div className="text-center">
                 <div className="text-2xl font-bold text-foreground">
-                  ${totalSpent.toFixed(2)}
+                  {formatPrice(totalSpent)}
                 </div>
                 <div className="text-sm text-muted-foreground mt-1">
                   Total Spent
@@ -194,9 +196,9 @@ export function AnalyticsView() {
               />
               <YAxis
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }}
-                tickFormatter={(value) => `$${value}`}
+                tickFormatter={(value) => `${currencySymbol}${value}`}
               />
-              <Tooltip content={<BarChartTooltip />} />
+              <Tooltip content={<BarChartTooltip formatPrice={formatPrice} />} />
               <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                 {dailyData.map((entry, index) => (
                   <Cell
@@ -214,7 +216,7 @@ export function AnalyticsView() {
             </div>
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded bg-red-500" />
-              <span>Above ${WARNING_THRESHOLD}</span>
+              <span>Above {formatPrice(WARNING_THRESHOLD)}</span>
             </div>
           </div>
         </CardContent>
@@ -242,7 +244,7 @@ export function AnalyticsView() {
                   </div>
                   <div className="text-right">
                     <div className="font-semibold text-foreground">
-                      ${category.value.toFixed(2)}
+                      {formatPrice(category.value)}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {category.percentage.toFixed(1)}%

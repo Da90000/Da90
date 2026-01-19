@@ -65,14 +65,12 @@ function borderClass(daysRemaining: number, paid: boolean): string {
   return "border-border bg-card";
 }
 
-function formatCurrency(value: number): string {
-  // Format as Taka (৳) with proper number formatting
-  return `৳${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { useCurrency } from "@/contexts/currency-context";
 
 type BillSortOption = "due-date" | "amount-high" | "alphabetical";
 
 export function BillTracker() {
+  const { formatPrice } = useCurrency();
   const [bills, setBills] = useState<BillWithDue[]>([]);
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<BillSortOption>("due-date");
@@ -234,7 +232,7 @@ export function BillTracker() {
               Monthly Fixed Costs
             </h1>
             <p className="mt-1 text-4xl font-bold tabular-nums text-foreground md:text-5xl">
-              {formatCurrency(totalMonthly)}
+              {formatPrice(totalMonthly)}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">Total burn rate per month</p>
           </div>
@@ -305,7 +303,7 @@ export function BillTracker() {
                     </div>
                     <div className="flex items-center justify-between gap-3 sm:justify-end sm:items-center">
                       <span className={`text-lg font-semibold tabular-nums ${paid ? "text-muted-foreground" : "text-foreground"}`}>
-                        {formatCurrency(bill.amount)}
+                        {formatPrice(bill.amount)}
                       </span>
                       <Button
                         size="sm"

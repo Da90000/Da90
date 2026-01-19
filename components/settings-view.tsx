@@ -8,14 +8,20 @@ import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useCurrency } from "@/contexts/currency-context";
+import { CURRENCIES } from "@/lib/settings-store";
 
 export function SettingsView() {
   const router = useRouter();
   const supabase = createClient();
+  const { currencySymbol, currencyCode, updateCurrency: updateCurrencySettings } = useCurrency();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const [updatingCurrency, setUpdatingCurrency] = useState(false);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -89,6 +95,38 @@ export function SettingsView() {
     }
   };
 
+  const handleCurrencyChange = async (currencyValue: string) => {
+    const selectedCurrency = CURRENCIES.find((c) => `${c.code}-${c.symbol}` === currencyValue);
+    if (!selectedCurrency) return;
+
+    setUpdatingCurrency(true);
+    try {
+      const result = await updateCurrencySettings(selectedCurrency.code, selectedCurrency.symbol);
+      if (result.success) {
+        toast({
+          title: "Currency updated",
+          description: `Currency changed to ${selectedCurrency.name}`,
+        });
+        // The context will automatically update, but we can force a reload if needed
+        window.location.reload(); // Simple approach - could be optimized with state management
+      } else {
+        toast({
+          title: "Failed to update currency",
+          description: result.error instanceof Error ? result.error.message : "Unknown error",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to update currency",
+        description: error instanceof Error ? error.message : "Unknown error",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdatingCurrency(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -129,6 +167,41 @@ export function SettingsView() {
             <LogOut className="mr-2 h-4 w-4" />
             Sign Out
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Regional Settings Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Regional Settings</CardTitle>
+          <CardDescription>Customize currency and regional preferences</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="currency-select">Currency</Label>
+            <Select
+              value={`${currencyCode}-${currencySymbol}`}
+              onValueChange={handleCurrencyChange}
+              disabled={updatingCurrency}
+            >
+              <SelectTrigger id="currency-select" className="w-full sm:w-[300px]">
+                <SelectValue placeholder="Select currency" />
+              </SelectTrigger>
+              <SelectContent>
+                {CURRENCIES.map((currency) => (
+                  <SelectItem key={currency.code} value={`${currency.code}-${currency.symbol}`}>
+                    {currency.symbol} {currency.name} ({currency.code})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {updatingCurrency && (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Updating currency...
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

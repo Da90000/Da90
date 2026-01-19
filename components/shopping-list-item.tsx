@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Minus, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Minus, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { ShoppingListItem } from "@/lib/types";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface ShoppingListItemCardProps {
   item: ShoppingListItem;
@@ -21,6 +22,7 @@ export function ShoppingListItemCard({
   onUpdatePrice,
   onRemove,
 }: ShoppingListItemCardProps) {
+  const { formatPrice, currencySymbol } = useCurrency();
   const effectivePrice = item.manualPrice ?? item.basePrice;
   const [localPrice, setLocalPrice] = useState<number>(effectivePrice);
   const [isInputFocused, setIsInputFocused] = useState(false);
@@ -37,8 +39,12 @@ export function ShoppingListItemCard({
 
   // Use persisted value for calculations to ensure consistency with stored data
   const calculatedPrice = item.manualPrice ?? item.basePrice;
-  const priceIncrease = item.basePrice ? ((calculatedPrice - item.basePrice) / item.basePrice) * 100 : 0;
-  const isHighIncrease = priceIncrease > 10;
+  const percentChange = item.basePrice ? ((calculatedPrice - item.basePrice) / item.basePrice) * 100 : 0;
+  const isPriceIncrease = percentChange > 0;
+  const isPriceDecrease = percentChange < 0;
+  const isSignificantIncrease = percentChange > 10;
+  const isSignificantDecrease = percentChange < -10;
+  const hasPriceChange = Math.abs(percentChange) > 0.01; // Account for floating point precision
   const itemTotal = calculatedPrice * item.quantity;
 
   // On blur: update manualPrice (or clear it). Never touch basePrice.
@@ -71,8 +77,10 @@ export function ShoppingListItemCard({
       className={`group flex items-center gap-4 rounded-lg border p-4 transition-all ${
         item.purchased
           ? "border-success/30 bg-success/5"
-          : isHighIncrease 
-            ? "border-destructive/50 bg-destructive/5" // Highlight if price is too high
+          : isSignificantIncrease 
+            ? "border-destructive/50 bg-destructive/10" // Highlight if price increased significantly
+          : isSignificantDecrease
+            ? "border-green-500/50 bg-green-500/10" // Highlight if price decreased significantly
             : "border-border bg-card hover:border-accent/50"
       }`}
     >
@@ -89,6 +97,9 @@ export function ShoppingListItemCard({
             <h3 className={`font-medium truncate ${item.purchased ? "text-muted-foreground line-through" : "text-foreground"}`}>
               {item.name}
             </h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Base Price: {formatPrice(item.basePrice)}
+            </p>
             
             <div className="flex flex-wrap items-center gap-3 mt-1">
               <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
@@ -97,7 +108,7 @@ export function ShoppingListItemCard({
               
               {/* Actual price input — large enough for touch without zoom */}
               <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">$</span>
+                <span className="text-xs text-muted-foreground">{currencySymbol}</span>
                 <input
                   type="number"
                   inputMode="decimal"
@@ -106,24 +117,51 @@ export function ShoppingListItemCard({
                   onFocus={handlePriceFocus}
                   onBlur={handlePriceBlur}
                   className={`min-h-[44px] w-20 rounded border bg-transparent px-2 text-base tabular-nums focus:outline-none focus:ring-2 focus:ring-ring md:w-16 md:min-h-0 md:border-0 md:border-b md:border-dashed md:px-0 md:text-xs ${
-                    isHighIncrease ? "text-destructive border-destructive font-bold md:border-destructive" : "border-input md:border-muted-foreground"
+                    isPriceIncrease && !item.purchased
+                      ? "text-destructive border-destructive font-bold md:border-destructive"
+                      : isPriceDecrease && !item.purchased
+                      ? "text-green-600 dark:text-green-500 border-green-500 font-bold md:border-green-500"
+                      : "border-input md:border-muted-foreground"
                   }`}
                 />
                 <span className="text-xs text-muted-foreground">each</span>
                 
-                {/* 4. THE ALERT ICON */}
-                {isHighIncrease && !item.purchased && (
-                  <div className="flex items-center gap-1 text-[10px] font-bold text-destructive animate-pulse">
-                    <AlertTriangle className="h-3 w-3" />
-                    {priceIncrease.toFixed(0)}% UP
+                {/* Price Change Badge */}
+                {hasPriceChange && !item.purchased && (
+                  <div
+                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      isPriceIncrease
+                        ? "bg-destructive/10 text-destructive"
+                        : "bg-green-500/10 text-green-600 dark:text-green-500"
+                    }`}
+                  >
+                    {isPriceIncrease ? (
+                      <>
+                        <TrendingUp className="h-3 w-3" />
+                        +{percentChange.toFixed(0)}%
+                      </>
+                    ) : (
+                      <>
+                        <TrendingDown className="h-3 w-3" />
+                        {percentChange.toFixed(0)}%
+                      </>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
 
-          <span className={`font-semibold whitespace-nowrap ${isHighIncrease && !item.purchased ? "text-destructive" : "text-foreground"}`}>
-            ${itemTotal.toFixed(2)}
+          <span
+            className={`font-semibold whitespace-nowrap ${
+              isPriceIncrease && !item.purchased
+                ? "text-destructive"
+                : isPriceDecrease && !item.purchased
+                ? "text-green-600 dark:text-green-500"
+                : "text-foreground"
+            }`}
+          >
+            {formatPrice(itemTotal)}
           </span>
         </div>
       </div>

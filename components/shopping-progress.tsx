@@ -1,6 +1,7 @@
 "use client";
 
 import { CheckCircle2, Circle, ShoppingBag } from "lucide-react";
+import { useCurrency } from "@/contexts/currency-context";
 
 interface ShoppingProgressProps {
   totalItems: number;
@@ -16,6 +17,7 @@ export function ShoppingProgress({
   originalBudget,
   purchasedValue,
 }: ShoppingProgressProps) {
+  const { formatPrice } = useCurrency();
   const progressPercent = totalItems > 0 ? (purchasedItems / totalItems) * 100 : 0;
   const isComplete = totalItems > 0 && purchasedItems === totalItems;
 
@@ -77,11 +79,11 @@ export function ShoppingProgress({
       <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
         <div>
           <p className="text-sm text-muted-foreground">Original Budget</p>
-          <p className="text-xl font-bold text-foreground">${originalBudget.toFixed(2)}</p>
+          <p className="text-xl font-bold text-foreground">{formatPrice(originalBudget)}</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-muted-foreground">Purchased So Far</p>
-          <p className="text-xl font-bold text-success">${purchasedValue.toFixed(2)}</p>
+          <p className="text-xl font-bold text-success">{formatPrice(purchasedValue)}</p>
         </div>
       </div>
     </div>

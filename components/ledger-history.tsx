@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
-import { Plus, CheckCircle2, Receipt } from "lucide-react";
-import { fetchLedger, addTransaction, settleDebt, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
+import { Plus, CheckCircle2, Receipt, CreditCard } from "lucide-react";
+import { fetchLedger, addTransaction, addDebtPayment, getTotalPaid, getRemainingAmount, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
 import { toast } from "@/hooks/use-toast";
 import {
   Card,
@@ -39,10 +39,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
-function formatCurrency(value: number): string {
-  return `৳${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+import { useCurrency } from "@/contexts/currency-context";
+import { Progress } from "@/components/ui/progress";
+import { Textarea } from "@/components/ui/textarea";
 
 function formatDate(iso: string): string {
   try {
@@ -57,6 +56,7 @@ const LEDGER_LOADING_ROWS = 5;
 type ViewType = "expenses" | "income" | "debt";
 
 export function LedgerHistory() {
+  const { formatPrice, currencySymbol } = useCurrency();
   const [view, setView] = useState<ViewType>("expenses");
   const [allLedgerItems, setAllLedgerItems] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -81,6 +81,14 @@ export function LedgerHistory() {
   const [expenseCategory, setExpenseCategory] = useState("");
   const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split("T")[0]!);
   const [expenseSaving, setExpenseSaving] = useState(false);
+
+  // Record Payment Dialog
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paymentDebtId, setPaymentDebtId] = useState<string | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().split("T")[0]!);
+  const [paymentNote, setPaymentNote] = useState("");
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -110,7 +118,13 @@ export function LedgerHistory() {
 
   const debtList = useMemo(() => {
     return allLedgerItems.filter(item => 
-      item.transaction_type === "debt_given" || item.transaction_type === "debt_taken"
+      (item.transaction_type === "debt_given" || item.transaction_type === "debt_taken") && !item.is_settled
+    );
+  }, [allLedgerItems]);
+
+  const settledDebtList = useMemo(() => {
+    return allLedgerItems.filter(item => 
+      (item.transaction_type === "debt_given" || item.transaction_type === "debt_taken") && item.is_settled === true
     );
   }, [allLedgerItems]);
 
@@ -227,21 +241,51 @@ export function LedgerHistory() {
     }
   };
 
-  const handleSettleDebt = async (id: string) => {
+  const handleOpenPaymentDialog = (debtId: string, remaining: number) => {
+    setPaymentDebtId(debtId);
+    setPaymentAmount(remaining > 0 ? remaining.toFixed(2) : "");
+    setPaymentDate(new Date().toISOString().split("T")[0]!);
+    setPaymentNote("");
+    setPaymentOpen(true);
+  };
+
+  const handleRecordPayment = async () => {
+    if (!paymentDebtId || !paymentAmount) {
+      toast({ title: "Enter payment amount", variant: "destructive" });
+      return;
+    }
+
+    const amount = Number.parseFloat(paymentAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast({ title: "Enter valid payment amount", variant: "destructive" });
+      return;
+    }
+
+    setPaymentSaving(true);
     try {
-      const { success, error } = await settleDebt(id);
+      const { success, error } = await addDebtPayment(
+        paymentDebtId,
+        amount,
+        paymentNote.trim() || undefined,
+        paymentDate ? new Date(paymentDate + "T23:59:59").toISOString() : undefined
+      );
+
       if (success) {
-        toast({ title: "Debt marked as settled" });
+        toast({ title: "Payment recorded successfully" });
+        setPaymentOpen(false);
+        setPaymentDebtId(null);
+        setPaymentAmount("");
+        setPaymentNote("");
         await loadData();
       } else {
         toast({
-          title: "Failed to settle debt",
+          title: "Failed to record payment",
           description: error instanceof Error ? error.message : String(error),
           variant: "destructive",
         });
       }
-    } catch (error) {
-      console.error("Settle debt error:", error);
+    } finally {
+      setPaymentSaving(false);
     }
   };
 
@@ -258,7 +302,7 @@ export function LedgerHistory() {
       <TableCell className="text-muted-foreground">{formatDate(r.date)}</TableCell>
       <TableCell className="font-medium">{r.itemName || "—"}</TableCell>
       <TableCell>{r.category}</TableCell>
-      <TableCell className="text-right tabular-nums">{formatCurrency(r.amount)}</TableCell>
+      <TableCell className="text-right tabular-nums">{formatPrice(r.amount)}</TableCell>
     </>
   );
 
@@ -268,7 +312,7 @@ export function LedgerHistory() {
       <TableCell className="font-medium text-emerald-700 dark:text-emerald-400">{r.itemName || "—"}</TableCell>
       <TableCell>{r.category}</TableCell>
       <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-400">
-        +{formatCurrency(r.amount)}
+        +{formatPrice(r.amount)}
       </TableCell>
     </>
   );
@@ -276,26 +320,47 @@ export function LedgerHistory() {
   const renderDebtRow = (r: LedgerEntry) => {
     const isGiven = r.transaction_type === "debt_given";
     const isSettled = r.is_settled === true;
+    const totalPaid = getTotalPaid(r);
+    const remaining = getRemainingAmount(r);
+    const progressPercent = r.amount > 0 ? (totalPaid / r.amount) * 100 : 0;
+
     return (
       <>
         <TableCell className="text-muted-foreground">{formatDate(r.date)}</TableCell>
         <TableCell className={`font-medium ${isSettled ? "line-through text-muted-foreground" : isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}`}>
-          {isGiven ? `Given to ${r.entity_name || r.itemName}` : `Borrowed from ${r.entity_name || r.itemName}`}
+          <div className="space-y-1">
+            <div>
+              {isGiven ? `Given to ${r.entity_name || r.itemName}` : `Borrowed from ${r.entity_name || r.itemName}`}
+            </div>
+            {!isSettled && (
+              <div className="text-xs space-y-1">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <span>Total: {formatPrice(r.amount)}</span>
+                  <span>•</span>
+                  <span>Paid: {formatPrice(totalPaid)}</span>
+                </div>
+                <div className="font-semibold text-foreground">
+                  Remaining: {formatPrice(remaining)}
+                </div>
+                <Progress value={progressPercent} className="h-1.5 w-24" />
+              </div>
+            )}
+          </div>
         </TableCell>
         <TableCell>{r.category}</TableCell>
         <TableCell className={`text-right tabular-nums ${isSettled ? "text-muted-foreground" : isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}`}>
-          {isGiven ? "-" : "+"}{formatCurrency(r.amount)}
+          {isGiven ? "-" : "+"}{formatPrice(r.amount)}
         </TableCell>
         <TableCell className="text-right">
           {!isSettled && (
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => handleSettleDebt(r.id)}
+              onClick={() => handleOpenPaymentDialog(r.id, remaining)}
               className="gap-1"
             >
-              <CheckCircle2 className="h-4 w-4" />
-              Mark Settled
+              <CreditCard className="h-4 w-4" />
+              Record Payment
             </Button>
           )}
         </TableCell>
@@ -308,6 +373,9 @@ export function LedgerHistory() {
     const isSettled = r.is_settled === true;
     const isIncome = type === "income";
     const isDebt = type === "debt";
+    const totalPaid = isDebt ? getTotalPaid(r) : 0;
+    const remaining = isDebt ? getRemainingAmount(r) : 0;
+    const progressPercent = isDebt && r.amount > 0 ? (totalPaid / r.amount) * 100 : 0;
     
     return (
       <div
@@ -338,6 +406,19 @@ export function LedgerHistory() {
             <p className="text-sm text-muted-foreground">
               {formatDate(r.date)} · {r.category}
             </p>
+            {isDebt && !isSettled && (
+              <div className="mt-2 space-y-1">
+                <div className="text-xs text-muted-foreground flex items-center gap-2">
+                  <span>Total: {formatPrice(r.amount)}</span>
+                  <span>•</span>
+                  <span>Paid: {formatPrice(totalPaid)}</span>
+                </div>
+                <div className="text-xs font-semibold text-foreground">
+                  Remaining: {formatPrice(remaining)}
+                </div>
+                <Progress value={progressPercent} className="h-1.5 w-32" />
+              </div>
+            )}
           </div>
           <div className="text-right">
             <p className={cn(
@@ -347,17 +428,17 @@ export function LedgerHistory() {
               !isSettled && isDebt && (isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"),
               !isSettled && !isIncome && !isDebt && "text-foreground"
             )}>
-              {isIncome ? "+" : isDebt && !isGiven ? "+" : isDebt ? "-" : ""}{formatCurrency(r.amount)}
+              {isIncome ? "+" : isDebt && !isGiven ? "+" : isDebt ? "-" : ""}{formatPrice(r.amount)}
             </p>
             {isDebt && !isSettled && (
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={() => handleSettleDebt(r.id)}
+                onClick={() => handleOpenPaymentDialog(r.id, remaining)}
                 className="mt-2 gap-1 text-xs"
               >
-                <CheckCircle2 className="h-3 w-3" />
-                Settle
+                <CreditCard className="h-3 w-3" />
+                Record Payment
               </Button>
             )}
           </div>
@@ -444,7 +525,7 @@ export function LedgerHistory() {
                 <Skeleton className="h-9 w-28" />
               ) : (
                 <p className="text-2xl font-bold tabular-nums text-foreground">
-                  {formatCurrency(totalExpenses)}
+                  {formatPrice(totalExpenses)}
                 </p>
               )}
             </CardContent>
@@ -524,7 +605,7 @@ export function LedgerHistory() {
                 <Skeleton className="h-9 w-28" />
               ) : (
                 <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-                  {formatCurrency(totalIncome)}
+                  {formatPrice(totalIncome)}
                 </p>
               )}
             </CardContent>
@@ -607,7 +688,7 @@ export function LedgerHistory() {
                   "text-2xl font-bold tabular-nums",
                   totalDebt >= 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"
                 )}>
-                  {totalDebt >= 0 ? "-" : "+"}{formatCurrency(Math.abs(totalDebt))}
+                  {totalDebt >= 0 ? "-" : "+"}{formatPrice(Math.abs(totalDebt))}
                 </p>
               )}
             </CardContent>
@@ -674,6 +755,45 @@ export function LedgerHistory() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Settled Debts Section */}
+          {settledDebtList.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-muted-foreground">Settled History</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="block space-y-3 p-4 md:hidden">
+                  {settledDebtList.map((r) => (
+                    <div key={r.id} className="opacity-60">
+                      {renderMobileCard(r, "debt")}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Date</TableHead>
+                        <TableHead>Description</TableHead>
+                        <TableHead>Category</TableHead>
+                        <TableHead className="text-right">Amount</TableHead>
+                        <TableHead className="text-right">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {settledDebtList.map((r) => (
+                        <TableRow key={r.id} className="opacity-60">
+                          {renderDebtRow(r)}
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
 
@@ -695,7 +815,7 @@ export function LedgerHistory() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="income-amount">Amount (৳)</Label>
+              <Label htmlFor="income-amount">Amount ({currencySymbol})</Label>
               <Input
                 id="income-amount"
                 type="number"
@@ -759,7 +879,7 @@ export function LedgerHistory() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="expense-amount">Amount (৳)</Label>
+              <Label htmlFor="expense-amount">Amount ({currencySymbol})</Label>
               <Input
                 id="expense-amount"
                 type="number"
@@ -851,7 +971,7 @@ export function LedgerHistory() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="debt-amount">Amount (৳)</Label>
+              <Label htmlFor="debt-amount">Amount ({currencySymbol})</Label>
               <Input
                 id="debt-amount"
                 type="number"
@@ -880,6 +1000,81 @@ export function LedgerHistory() {
                 </>
               ) : (
                 "Add Debt"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Record Payment Dialog */}
+      <Dialog
+        open={paymentOpen}
+        onOpenChange={(open) => {
+          if (!open && !paymentSaving) {
+            setPaymentDebtId(null);
+            setPaymentAmount("");
+            setPaymentNote("");
+            setPaymentDate(new Date().toISOString().split("T")[0]!);
+          }
+          setPaymentOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Record Payment</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="payment-amount">Amount Paid ({currencySymbol})</Label>
+              <Input
+                id="payment-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g., 300.00"
+                value={paymentAmount}
+                onChange={(e) => setPaymentAmount(e.target.value)}
+                disabled={paymentSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payment-date">Date</Label>
+              <Input
+                id="payment-date"
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                disabled={paymentSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="payment-note">Note (Optional)</Label>
+              <Textarea
+                id="payment-note"
+                placeholder="e.g., First installment payment"
+                value={paymentNote}
+                onChange={(e) => setPaymentNote(e.target.value)}
+                disabled={paymentSaving}
+                rows={2}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPaymentOpen(false)}
+              disabled={paymentSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleRecordPayment} disabled={paymentSaving}>
+              {paymentSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                "Save Payment"
               )}
             </Button>
           </DialogFooter>

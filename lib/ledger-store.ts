@@ -6,6 +6,14 @@ const INVENTORY_KEY = "shoplist-inventory";
 
 export type TransactionType = "expense" | "income" | "debt_given" | "debt_taken";
 
+export interface DebtPayment {
+  id: string;
+  ledger_id: string;
+  amount: number;
+  note?: string;
+  created_at: string;
+}
+
 export interface LedgerEntry {
   id: string;
   date: string;
@@ -16,6 +24,7 @@ export interface LedgerEntry {
   transaction_type?: TransactionType;
   entity_name?: string; // For debt: who gave/took the money
   is_settled?: boolean; // For debt: whether it's been settled
+  payments?: DebtPayment[]; // For debt: partial payments made
 }
 
 export function getLedger(): LedgerEntry[] {
@@ -217,9 +226,9 @@ export async function addTransaction(transaction: {
 }
 
 /**
- * Fetches ledger entries from Supabase.
+ * Fetches ledger entries from Supabase, including debt payments.
  * @param filters - Optional filters for transaction type and settled status
- * @returns Array of LedgerEntry objects
+ * @returns Array of LedgerEntry objects with payments for debt items
  */
 export async function fetchLedger(filters?: {
   transaction_type?: TransactionType;
@@ -256,21 +265,135 @@ export async function fetchLedger(filters?: {
 
   if (!data) return [];
 
-  return data.map((row: any) => ({
-    id: String(row.id ?? ""),
-    date: String(row.created_at ?? ""),
-    itemName: String(row.item_name ?? ""),
-    category: String(row.category ?? ""),
-    amount: Number(row.amount) || 0,
-    quantity: Number(row.quantity) || 1,
-    transaction_type: row.transaction_type as TransactionType | undefined,
-    entity_name: row.entity_name ? String(row.entity_name) : undefined,
-    is_settled: row.is_settled === true,
-  }));
+  // For debt items, fetch payments
+  const entries = await Promise.all(
+    data.map(async (row: any) => {
+      const entry: LedgerEntry = {
+        id: String(row.id ?? ""),
+        date: String(row.created_at ?? ""),
+        itemName: String(row.item_name ?? ""),
+        category: String(row.category ?? ""),
+        amount: Number(row.amount) || 0,
+        quantity: Number(row.quantity) || 1,
+        transaction_type: row.transaction_type as TransactionType | undefined,
+        entity_name: row.entity_name ? String(row.entity_name) : undefined,
+        is_settled: row.is_settled === true,
+      };
+
+      // Fetch payments for debt items
+      if (entry.transaction_type?.startsWith("debt_")) {
+        try {
+          const { data: payments, error: paymentsError } = await supabase
+            .from("debt_payments")
+            .select("id, ledger_id, amount, note, created_at")
+            .eq("ledger_id", entry.id)
+            .order("created_at", { ascending: true });
+
+          if (!paymentsError && payments) {
+            entry.payments = payments.map((p: any) => ({
+              id: String(p.id ?? ""),
+              ledger_id: String(p.ledger_id ?? ""),
+              amount: Number(p.amount) || 0,
+              note: p.note ? String(p.note) : undefined,
+              created_at: String(p.created_at ?? ""),
+            }));
+          }
+        } catch (err) {
+          // Table might not exist yet, skip payments
+          console.warn("Could not fetch debt payments:", err);
+        }
+      }
+
+      return entry;
+    })
+  );
+
+  return entries;
 }
 
 /**
- * Settles a debt by marking it as settled.
+ * Adds a partial payment to a debt.
+ * @param ledgerId - The ledger entry ID (debt)
+ * @param amount - The payment amount
+ * @param note - Optional note about the payment
+ * @param paymentDate - Optional payment date (defaults to now)
+ * @returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function addDebtPayment(
+  ledgerId: string,
+  amount: number,
+  note?: string,
+  paymentDate?: string
+): Promise<{ success: boolean; error: unknown }> {
+  if (!supabase) {
+    return { success: false, error: new Error("Supabase client not initialized") };
+  }
+
+  // Validate amount
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return { success: false, error: new Error("Invalid payment amount") };
+  }
+
+  try {
+    // First, get the debt entry to check current status
+    const { data: debtEntry, error: fetchError } = await supabase
+      .from("ledger")
+      .select("amount, transaction_type, is_settled")
+      .eq("id", ledgerId)
+      .single();
+
+    if (fetchError || !debtEntry) {
+      return { success: false, error: fetchError || new Error("Debt entry not found") };
+    }
+
+    // Check if it's actually a debt
+    if (!debtEntry.transaction_type?.startsWith("debt_")) {
+      return { success: false, error: new Error("Entry is not a debt") };
+    }
+
+    // Get existing payments to calculate total paid
+    const { data: existingPayments, error: paymentsError } = await supabase
+      .from("debt_payments")
+      .select("amount")
+      .eq("ledger_id", ledgerId);
+
+    const totalPaid =
+      (existingPayments?.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0) || 0) + amount;
+    const originalAmount = Number(debtEntry.amount || 0);
+
+    // Insert the payment
+    const { error: insertError } = await supabase.from("debt_payments").insert({
+      ledger_id: ledgerId,
+      amount: amount,
+      note: note || null,
+      created_at: paymentDate || new Date().toISOString(),
+    });
+
+    if (insertError) {
+      return { success: false, error: insertError };
+    }
+
+    // If total paid >= original amount, mark as settled
+    if (totalPaid >= originalAmount && !debtEntry.is_settled) {
+      const { error: updateError } = await supabase
+        .from("ledger")
+        .update({ is_settled: true })
+        .eq("id", ledgerId);
+
+      if (updateError) {
+        console.warn("Payment recorded but failed to mark debt as settled:", updateError);
+        // Don't fail the whole operation if this fails
+      }
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error };
+  }
+}
+
+/**
+ * Settles a debt by marking it as settled (legacy function, kept for compatibility).
  * @param id - The ledger entry ID
  * @returns { success: true, error: null } on success, or { success: false, error } on failure.
  */
@@ -289,4 +412,26 @@ export async function settleDebt(id: string): Promise<{ success: boolean; error:
   }
 
   return { success: true, error: null };
+}
+
+/**
+ * Calculates the total amount paid for a debt entry.
+ * @param entry - The ledger entry (debt)
+ * @returns Total amount paid
+ */
+export function getTotalPaid(entry: LedgerEntry): number {
+  if (!entry.payments || entry.payments.length === 0) {
+    return 0;
+  }
+  return entry.payments.reduce((sum: number, payment: DebtPayment) => sum + payment.amount, 0);
+}
+
+/**
+ * Calculates the remaining amount for a debt entry.
+ * @param entry - The ledger entry (debt)
+ * @returns Remaining amount to be paid
+ */
+export function getRemainingAmount(entry: LedgerEntry): number {
+  const totalPaid = getTotalPaid(entry);
+  return Math.max(0, entry.amount - totalPaid);
 }

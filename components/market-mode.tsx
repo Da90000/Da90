@@ -5,6 +5,7 @@ import { Loader2, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ShoppingListItemCard } from "@/components/shopping-list-item";
 import { ShoppingProgress } from "@/components/shopping-progress";
+import { useCurrency } from "@/contexts/currency-context";
 import { toast } from "@/hooks/use-toast";
 import { addToLedger, saveToLedger } from "@/lib/ledger-store";
 import type { ShoppingListItem } from "@/lib/types";
@@ -28,6 +29,7 @@ export function MarketMode({
   onClearList,
   onGoToInventory,
 }: MarketModeProps) {
+  const { formatPrice } = useCurrency();
   const [isSaving, setIsSaving] = useState(false);
 
   const stats = useMemo(() => {
@@ -137,7 +139,7 @@ export function MarketMode({
             <p
               className={`text-2xl font-bold ${stats.estimatedTotal > stats.budget ? "text-destructive" : ""}`}
             >
-              ${stats.estimatedTotal.toFixed(2)}
+              {formatPrice(stats.estimatedTotal)}
             </p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">

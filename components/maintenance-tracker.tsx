@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { format, addDays, parseISO } from "date-fns";
 import { AlertTriangle, Loader2, MoreVertical, Pencil, Plus, Trash2, Wrench } from "lucide-react";
+import { useCurrency } from "@/contexts/currency-context";
 import {
   addMaintenanceItem,
   deleteMaintenanceItem,
@@ -52,14 +53,24 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
-type Status = "overdue" | "healthy";
+type Status = "overdue" | "warning" | "healthy";
 
 function getStatus(item: MaintenanceItem): Status {
   const days = getDaysOverdue(
     item.last_service_date,
     item.service_interval_days
   );
-  return days > 0 ? "overdue" : "healthy";
+  // days > 0 means overdue, days < 0 means days remaining
+  // daysRemaining = -days
+  const daysRemaining = -days;
+  
+  if (daysRemaining < 0) {
+    return "overdue"; // Past due date
+  } else if (daysRemaining >= 0 && daysRemaining <= 7) {
+    return "warning"; // Due within 7 days
+  } else {
+    return "healthy"; // More than 7 days remaining
+  }
 }
 
 function getProgressPercent(item: MaintenanceItem): number {
@@ -75,9 +86,13 @@ function getProgressPercent(item: MaintenanceItem): number {
 }
 
 function progressIndicatorClass(status: Status): string {
-  return status === "overdue"
-    ? "[&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-rose-500 [&_[data-slot=progress-indicator]]:!to-orange-400"
-    : "[&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-emerald-500 [&_[data-slot=progress-indicator]]:!to-emerald-400";
+  if (status === "overdue") {
+    return "[&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-rose-500 [&_[data-slot=progress-indicator]]:!to-orange-400";
+  } else if (status === "warning") {
+    return "[&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-amber-500 [&_[data-slot=progress-indicator]]:!to-yellow-400";
+  } else {
+    return "[&_[data-slot=progress-indicator]]:!bg-gradient-to-r [&_[data-slot=progress-indicator]]:!from-emerald-500 [&_[data-slot=progress-indicator]]:!to-emerald-400";
+  }
 }
 
 function MaintenanceCard({
@@ -91,6 +106,7 @@ function MaintenanceCard({
   onEdit: (id: string, updates: Partial<MaintenanceItem>) => Promise<boolean>;
   onDelete: (id: string) => Promise<boolean>;
 }) {
+  const { currencySymbol } = useCurrency();
   const status = getStatus(item);
   const progress = getProgressPercent(item);
   const days = getDaysOverdue(item.last_service_date, item.service_interval_days);
@@ -126,8 +142,15 @@ function MaintenanceCard({
     ? format(new Date(item.last_service_date), "MMM d, yyyy")
     : "—";
 
-  const heroNumber = days > 0 ? days : -days;
-  const heroLabel = days > 0 ? "Days overdue" : "Days remaining";
+  // Calculate daysRemaining (negative if overdue, positive if healthy)
+  const daysRemaining = -days;
+  const heroNumber = daysRemaining < 0 ? Math.abs(daysRemaining) : daysRemaining;
+  const heroLabel = 
+    daysRemaining < 0 
+      ? "Days overdue" 
+      : status === "warning"
+      ? "Due soon"
+      : "Days remaining";
 
   const handleLogService = async () => {
     const cost = Math.max(0, Number.parseFloat(costInput) || 0);
@@ -189,11 +212,15 @@ function MaintenanceCard({
         "relative overflow-hidden rounded-xl border border-border/50 bg-gradient-to-b from-card to-card/50 p-5 shadow-sm transition-all hover:shadow-md hover:border-border"
       )}
     >
-      {/* Glow line: green (healthy) or red (overdue) */}
+      {/* Glow line: red (overdue), yellow (warning), or green (healthy) */}
       <div
         className={cn(
           "absolute left-0 right-0 top-0 h-1",
-          status === "overdue" ? "bg-rose-500/80" : "bg-emerald-500/80"
+          status === "overdue" 
+            ? "bg-rose-500/80" 
+            : status === "warning"
+            ? "bg-amber-500/80"
+            : "bg-emerald-500/80"
         )}
       />
 
@@ -244,16 +271,33 @@ function MaintenanceCard({
             <span
               className={cn(
                 "font-mono text-3xl font-bold tabular-nums",
-                status === "overdue" ? "text-rose-500" : "text-emerald-500"
+                status === "overdue" 
+                  ? "text-rose-500" 
+                  : status === "warning"
+                  ? "text-amber-500"
+                  : "text-emerald-500"
               )}
             >
               {heroNumber}
             </span>
-            {status === "overdue" && (
-              <AlertTriangle className="h-4 w-4 shrink-0 text-rose-500" aria-hidden />
+            {(status === "overdue" || status === "warning") && (
+              <AlertTriangle 
+                className={cn(
+                  "h-4 w-4 shrink-0",
+                  status === "overdue" ? "text-rose-500" : "text-amber-500"
+                )} 
+                aria-hidden 
+              />
             )}
           </div>
-          <p className="text-xs text-muted-foreground">{heroLabel}</p>
+          <p 
+            className={cn(
+              "text-xs",
+              status === "warning" ? "text-amber-500" : "text-muted-foreground"
+            )}
+          >
+            {heroLabel}
+          </p>
         </div>
 
         {/* Progress bar: bottom of content, gradient indicator */}
@@ -299,7 +343,7 @@ function MaintenanceCard({
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="cost">Amount ($)</Label>
+                  <Label htmlFor="cost">Amount ({currencySymbol})</Label>
                   <Input
                     id="cost"
                     type="number"
@@ -430,6 +474,7 @@ function MaintenanceCard({
 }
 
 export function MaintenanceTracker() {
+  const { currencySymbol } = useCurrency();
   const [items, setItems] = useState<MaintenanceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
@@ -457,16 +502,33 @@ export function MaintenanceTracker() {
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
-      // Always put overdue items first (strictly)
       const da = getDaysOverdue(a.last_service_date, a.service_interval_days);
       const db = getDaysOverdue(b.last_service_date, b.service_interval_days);
-      // Overdue items come first
-      if (da > 0 && db <= 0) return -1;
-      if (da <= 0 && db > 0) return 1;
-      // Among overdue items, sort by most overdue first
-      if (da > 0 && db > 0) return db - da;
-      // Among healthy items, sort by days remaining (soonest first)
-      if (da <= 0 && db <= 0) return da - db;
+      const daysRemainingA = -da;
+      const daysRemainingB = -db;
+      const statusA = getStatus(a);
+      const statusB = getStatus(b);
+      
+      // Priority: overdue > warning > healthy
+      if (statusA === "overdue" && statusB !== "overdue") return -1;
+      if (statusA !== "overdue" && statusB === "overdue") return 1;
+      if (statusA === "warning" && statusB === "healthy") return -1;
+      if (statusA === "healthy" && statusB === "warning") return 1;
+      
+      // Within same status, sort by urgency
+      if (statusA === "overdue" && statusB === "overdue") {
+        // Most overdue first
+        return db - da;
+      }
+      if (statusA === "warning" && statusB === "warning") {
+        // Fewest days remaining first (most urgent)
+        return daysRemainingA - daysRemainingB;
+      }
+      if (statusA === "healthy" && statusB === "healthy") {
+        // Fewest days remaining first
+        return daysRemainingA - daysRemainingB;
+      }
+      
       return 0;
     });
   }, [items]);
