@@ -3,6 +3,7 @@ export interface InventoryItem {
   name: string;
   category: string;
   basePrice: number;
+  lastPaidPrice?: number; // Last price paid when purchased (optional)
   createdAt: Date;
 }
 
@@ -11,12 +12,15 @@ export interface ShoppingListItem {
   inventoryItemId: string;
   name: string;
   category: string;
+  /** Immutable original budget from inventory. Used for Budget. */
   basePrice: number;
+  /** What the user types in the store; overrides basePrice for totals/ledger. */
+  manualPrice?: number;
   quantity: number;
   purchased: boolean;
 }
 
-export type ViewMode = "inventory" | "market";
+export type ViewMode = "inventory" | "market" | "expenses" | "maintenance" | "dashboard" | "bills" | "analytics";
 
 export const CATEGORIES = [
   "Produce",

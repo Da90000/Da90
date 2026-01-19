@@ -1,9 +1,8 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
-import { Plus, X } from "lucide-react";
+import React from "react";
+import { useState, useEffect } from "react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,48 +14,50 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { CATEGORIES } from "@/lib/types";
+import type { InventoryItem } from "@/lib/types";
 
-interface AddItemDialogProps {
-  onAddItem: (item: { name: string; category: string; basePrice: number }) => void;
+interface EditItemDialogProps {
+  item: InventoryItem | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (id: string, updates: { name: string; category: string; basePrice: number }) => void;
 }
 
-export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function EditItemDialog({ item, isOpen, onClose, onSave }: EditItemDialogProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
 
+  // Update form when item changes
+  useEffect(() => {
+    if (item) {
+      setName(item.name);
+      setCategory(item.category);
+      setPrice(item.basePrice.toString());
+    }
+  }, [item]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !category || !price) return;
+    if (!item || !name.trim() || !category || !price) return;
 
-    onAddItem({
+    onSave(item.id, {
       name: name.trim(),
       category,
       basePrice: Number.parseFloat(price),
     });
 
-    setName("");
-    setCategory("");
-    setPrice("");
-    setIsOpen(false);
+    onClose();
   };
 
-  if (!isOpen) {
-    return (
-      <Button onClick={() => setIsOpen(true)} className="gap-2">
-        <Plus className="h-4 w-4" />
-        Add Item
-      </Button>
-    );
-  }
+  if (!isOpen || !item) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
       <div className="relative w-full max-w-md rounded-lg border border-border bg-card p-6 shadow-lg">
         <button
           type="button"
-          onClick={() => setIsOpen(false)}
+          onClick={onClose}
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
         >
           <X className="h-4 w-4" />
@@ -64,17 +65,17 @@ export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
         </button>
 
         <div className="mb-6">
-          <h2 className="text-lg font-semibold text-foreground">Add New Item</h2>
+          <h2 className="text-lg font-semibold text-foreground">Edit Item</h2>
           <p className="text-sm text-muted-foreground">
-            Add a new item to your master inventory
+            Update the base price if the market has permanently changed (e.g., inflation)
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Item Name</Label>
+            <Label htmlFor="edit-name">Item Name</Label>
             <Input
-              id="name"
+              id="edit-name"
               placeholder="Enter item name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -83,7 +84,7 @@ export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="category">Category</Label>
+            <Label htmlFor="edit-category">Category</Label>
             <Select value={category} onValueChange={setCategory}>
               <SelectTrigger className="bg-input">
                 <SelectValue placeholder="Select a category" />
@@ -99,9 +100,9 @@ export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="price">Base Price (BDT)</Label>
+            <Label htmlFor="edit-price">Base Price (BDT)</Label>
             <Input
-              id="price"
+              id="edit-price"
               type="number"
               step="0.01"
               min="0"
@@ -110,19 +111,22 @@ export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
               onChange={(e) => setPrice(e.target.value)}
               className="bg-input"
             />
+            <p className="text-xs text-muted-foreground">
+              Update this if the standard market price has permanently changed
+            </p>
           </div>
 
           <div className="flex gap-3 pt-4">
             <Button
               type="button"
               variant="outline"
-              onClick={() => setIsOpen(false)}
+              onClick={onClose}
               className="flex-1"
             >
               Cancel
             </Button>
             <Button type="submit" className="flex-1">
-              Add Item
+              Save Changes
             </Button>
           </div>
         </form>

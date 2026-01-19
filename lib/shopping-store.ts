@@ -28,6 +28,7 @@ export async function fetchInventoryFromSupabase(): Promise<InventoryItem[]> {
     name: item.name,
     category: item.category,
     basePrice: parseFloat(item.base_price) || 0,
+    lastPaidPrice: item.last_paid_price ? parseFloat(item.last_paid_price) : undefined,
     createdAt: new Date(item.created_at),
   })) as InventoryItem[];
 }
@@ -81,6 +82,7 @@ export async function addInventoryItemToSupabase(
     name: data.name,
     category: data.category,
     basePrice: parseFloat(data.base_price) || 0,
+    lastPaidPrice: data.last_paid_price ? parseFloat(data.last_paid_price) : undefined,
     createdAt: new Date(data.created_at),
   } as InventoryItem;
 }
@@ -121,13 +123,16 @@ export async function addToLedger(
   }
 
   // Map ShoppingListItem to ledger schema: item_name, category, quantity, amount
-  const payload = items.map((item) => ({
-    item_name: item.name,
-    category: item.category,
-    quantity: item.quantity,
-    amount: item.basePrice * item.quantity, // Total amount paid
-    created_at: new Date().toISOString(),
-  }));
+  const payload = items.map((item) => {
+    const price = item.manualPrice ?? item.basePrice;
+    return {
+      item_name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      amount: price * item.quantity,
+      created_at: new Date().toISOString(),
+    };
+  });
 
   const { data, error } = await supabase.from("ledger").insert(payload).select();
 
@@ -187,6 +192,80 @@ export function addInventoryItem(
   });
   
   return newItem;
+}
+
+/**
+ * Update inventory item in Supabase.
+ * Updates name, category, and base_price (but NOT last_paid_price).
+ */
+export async function updateInventoryItemInSupabase(
+  id: string,
+  updates: { name: string; category: string; basePrice: number }
+): Promise<InventoryItem | null> {
+  if (!supabase) {
+    console.warn("Supabase client not initialized. Skipping sync.");
+    return null;
+  }
+
+  const payload: any = {
+    name: updates.name,
+    category: updates.category,
+    base_price: updates.basePrice,
+  };
+
+  const { data, error } = await supabase
+    .from("inventory")
+    .update(payload)
+    .eq("id", id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error("Supabase update error:", error);
+    return null;
+  }
+
+  if (!data) {
+    console.error("Supabase update returned no data");
+    return null;
+  }
+
+  // Map snake_case back to camelCase
+  return {
+    id: data.id,
+    name: data.name,
+    category: data.category,
+    basePrice: parseFloat(data.base_price) || 0,
+    lastPaidPrice: data.last_paid_price ? parseFloat(data.last_paid_price) : undefined,
+    createdAt: new Date(data.created_at),
+  } as InventoryItem;
+}
+
+/**
+ * Update inventory item locally (synchronous version for UI updates).
+ * Also syncs to Supabase in the background.
+ * Only updates name, category, and basePrice - preserves lastPaidPrice.
+ */
+export function updateInventoryItem(
+  id: string,
+  updates: { name: string; category: string; basePrice: number }
+): void {
+  const inventory = getInventory();
+  const item = inventory.find((item) => item.id === id);
+  if (!item) return;
+
+  // Update the item while preserving lastPaidPrice
+  item.name = updates.name;
+  item.category = updates.category;
+  item.basePrice = updates.basePrice;
+  // lastPaidPrice is preserved automatically
+
+  saveInventory(inventory);
+
+  // Sync to Supabase in the background
+  updateInventoryItemInSupabase(id, updates).catch((error) => {
+    console.error("Failed to sync inventory update to Supabase:", error);
+  });
 }
 
 /**
@@ -270,6 +349,19 @@ export function updateQuantity(id: string, quantity: number): void {
     item.quantity = Math.max(1, quantity);
     saveShoppingList(shoppingList);
   }
+}
+
+/** Updates only manualPrice. Does not touch basePrice. Pass undefined to clear the override. */
+export function updateItemPrice(id: string, price: number | undefined): void {
+  const shoppingList = getShoppingList();
+  const item = shoppingList.find((item) => item.id === id);
+  if (!item) return;
+  if (price === undefined) {
+    delete item.manualPrice;
+  } else if (Number.isFinite(price) && price >= 0) {
+    item.manualPrice = price;
+  }
+  saveShoppingList(shoppingList);
 }
 
 export function clearShoppingList(): void {
