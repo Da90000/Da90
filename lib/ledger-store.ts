@@ -11,7 +11,7 @@ export interface DebtPayment {
   ledger_id: string;
   amount: number;
   note?: string;
-  created_at: string;
+  payment_date: string;
 }
 
 export interface LedgerEntry {
@@ -285,9 +285,9 @@ export async function fetchLedger(filters?: {
         try {
           const { data: payments, error: paymentsError } = await supabase
             .from("debt_payments")
-            .select("id, ledger_id, amount, note, created_at")
+            .select("id, ledger_id, amount, note, payment_date")
             .eq("ledger_id", entry.id)
-            .order("created_at", { ascending: true });
+            .order("payment_date", { ascending: true });
 
           if (!paymentsError && payments) {
             entry.payments = payments.map((p: any) => ({
@@ -295,7 +295,7 @@ export async function fetchLedger(filters?: {
               ledger_id: String(p.ledger_id ?? ""),
               amount: Number(p.amount) || 0,
               note: p.note ? String(p.note) : undefined,
-              created_at: String(p.created_at ?? ""),
+              payment_date: String(p.payment_date ?? ""),
             }));
           }
         } catch (err) {
@@ -366,11 +366,12 @@ export async function addDebtPayment(
       ledger_id: ledgerId,
       amount: amount,
       note: note || null,
-      created_at: paymentDate || new Date().toISOString(),
+      payment_date: paymentDate || new Date().toISOString(),
     });
 
     if (insertError) {
-      return { success: false, error: insertError };
+      console.error("Payment Error:", JSON.stringify(insertError, null, 2));
+      return { success: false, error: insertError.message };
     }
 
     // If total paid >= original amount, mark as settled
