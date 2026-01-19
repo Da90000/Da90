@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { BillTracker } from "@/components/bill-tracker";
+import { DashboardView } from "@/components/dashboard-view";
 import { Header } from "@/components/header";
+import { LedgerHistory } from "@/components/ledger-history";
+import { MaintenanceTracker } from "@/components/maintenance-tracker";
 import { MasterInventory } from "@/components/master-inventory";
 import { MarketMode } from "@/components/market-mode";
 import { Spinner } from "@/components/ui/spinner";
@@ -16,13 +20,14 @@ import {
   removeFromShoppingList,
   togglePurchased,
   updateQuantity,
+  updateItemPrice,
   clearShoppingList,
   fetchInventoryFromSupabase,
   addInventoryItemToSupabase,
 } from "@/lib/shopping-store";
 
 export default function ShopListApp() {
-  const [currentView, setCurrentView] = useState<ViewMode>("inventory");
+  const [currentView, setCurrentView] = useState<ViewMode>("dashboard");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -119,6 +124,11 @@ export default function ShopListApp() {
     setShoppingList(getShoppingList());
   }, []);
 
+  const handleUpdatePrice = useCallback((id: string, price: number | undefined) => {
+    updateItemPrice(id, price);
+    setShoppingList(getShoppingList());
+  }, []);
+
   const handleRemoveItem = useCallback((id: string) => {
     removeFromShoppingList(id);
     setShoppingList(getShoppingList());
@@ -131,6 +141,10 @@ export default function ShopListApp() {
 
   const handleGoToInventory = useCallback(() => {
     setCurrentView("inventory");
+  }, []);
+
+  const handleNavigate = useCallback((mode: ViewMode) => {
+    setCurrentView(mode);
   }, []);
 
   if (!isLoaded) {
@@ -152,8 +166,11 @@ export default function ShopListApp() {
         shoppingListCount={shoppingList.length}
       />
 
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {currentView === "inventory" ? (
+      <main className="mx-auto max-w-7xl px-4 pt-8 pb-20 sm:px-6 md:pb-8 lg:px-8">
+        {currentView === "dashboard" && (
+          <DashboardView onNavigate={handleNavigate} />
+        )}
+        {currentView === "inventory" && (
           <MasterInventory
             inventory={inventory}
             shoppingList={shoppingList}
@@ -161,16 +178,21 @@ export default function ShopListApp() {
             onDeleteItem={handleDeleteItem}
             onAddToCart={handleAddToCart}
           />
-        ) : (
+        )}
+        {currentView === "market" && (
           <MarketMode
             shoppingList={shoppingList}
             onTogglePurchased={handleTogglePurchased}
             onUpdateQuantity={handleUpdateQuantity}
+            onUpdatePrice={handleUpdatePrice}
             onRemoveItem={handleRemoveItem}
             onClearList={handleClearList}
             onGoToInventory={handleGoToInventory}
           />
         )}
+        {currentView === "expenses" && <LedgerHistory />}
+        {currentView === "maintenance" && <MaintenanceTracker />}
+        {currentView === "bills" && <BillTracker />}
       </main>
     </div>
   );

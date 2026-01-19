@@ -1,16 +1,19 @@
 "use client";
 
-import { useMemo } from "react";
-import { ShoppingCart, Trash2 } from "lucide-react";
+import { useMemo, useState } from "react";
+import { Loader2, ShoppingCart, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ShoppingListItemCard } from "@/components/shopping-list-item";
 import { ShoppingProgress } from "@/components/shopping-progress";
+import { toast } from "@/hooks/use-toast";
+import { addToLedger, saveToLedger } from "@/lib/ledger-store";
 import type { ShoppingListItem } from "@/lib/types";
 
 interface MarketModeProps {
   shoppingList: ShoppingListItem[];
   onTogglePurchased: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
+  onUpdatePrice: (id: string, price: number | undefined) => void;
   onRemoveItem: (id: string) => void;
   onClearList: () => void;
   onGoToInventory: () => void;
@@ -20,22 +23,30 @@ export function MarketMode({
   shoppingList,
   onTogglePurchased,
   onUpdateQuantity,
+  onUpdatePrice,
   onRemoveItem,
   onClearList,
   onGoToInventory,
 }: MarketModeProps) {
+  const [isSaving, setIsSaving] = useState(false);
+
   const stats = useMemo(() => {
     const purchased = shoppingList.filter((item) => item.purchased);
-    const totalValue = shoppingList.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
+    const budget = shoppingList.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
+    const estimatedTotal = shoppingList.reduce(
+      (sum, item) => sum + (item.manualPrice ?? item.basePrice) * item.quantity,
+      0
+    );
     const purchasedValue = purchased.reduce(
-      (sum, item) => sum + item.basePrice * item.quantity,
+      (sum, item) => sum + (item.manualPrice ?? item.basePrice) * item.quantity,
       0
     );
 
     return {
       totalItems: shoppingList.length,
       purchasedItems: purchased.length,
-      totalValue,
+      budget,
+      estimatedTotal,
       purchasedValue,
     };
   }, [shoppingList]);
@@ -67,7 +78,7 @@ export function MarketMode({
           <p className="text-muted-foreground mb-6 text-center max-w-sm">
             Start adding items from your Master Inventory to create your shopping list
           </p>
-          <Button onClick={onGoToInventory} className="gap-2">
+          <Button onClick={onGoToInventory} className="w-full gap-2 sm:w-auto">
             Browse Inventory
           </Button>
         </div>
@@ -91,7 +102,7 @@ export function MarketMode({
       <ShoppingProgress
         totalItems={stats.totalItems}
         purchasedItems={stats.purchasedItems}
-        totalValue={stats.totalValue}
+        originalBudget={stats.budget}
         purchasedValue={stats.purchasedValue}
       />
 
@@ -110,6 +121,7 @@ export function MarketMode({
                     item={item}
                     onTogglePurchased={onTogglePurchased}
                     onUpdateQuantity={onUpdateQuantity}
+                    onUpdatePrice={onUpdatePrice}
                     onRemove={onRemoveItem}
                   />
                 ))}
@@ -118,38 +130,64 @@ export function MarketMode({
           ))}
       </div>
 
-      <div className="sticky bottom-4 rounded-lg border border-border bg-card/95 backdrop-blur p-4 shadow-lg">
-        <div className="flex items-center justify-between">
+      <div className="sticky bottom-20 rounded-lg border border-border bg-card/95 backdrop-blur p-4 shadow-lg md:bottom-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <p className="text-sm text-muted-foreground">Total ({shoppingList.length} items)</p>
-            <p className="text-2xl font-bold text-foreground">${stats.totalValue.toFixed(2)}</p>
+            <p className="text-sm text-muted-foreground">Est. Checkout</p>
+            <p
+              className={`text-2xl font-bold ${stats.estimatedTotal > stats.budget ? "text-destructive" : ""}`}
+            >
+              ${stats.estimatedTotal.toFixed(2)}
+            </p>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={onGoToInventory} variant="outline" className="gap-2 bg-transparent">
+          <div className="flex flex-col gap-2 sm:flex-row sm:gap-2">
+            <Button onClick={onGoToInventory} variant="outline" className="w-full gap-2 bg-transparent sm:w-auto">
               Add More Items
             </Button>
             {shoppingList.some(item => item.purchased) && (
               <Button
                 onClick={async () => {
-                  // Dynamically import addToLedger for client-side usage
-                  const { addToLedger } = await import("@/lib/ledger-store");
-                  const purchasedItems = shoppingList.filter(item => item.purchased);
-                  addToLedger(purchasedItems);
+                  setIsSaving(true);
+                  const purchasedItems = shoppingList.filter((item) => item.purchased);
+                  const { success, error } = await saveToLedger(purchasedItems);
+                  setIsSaving(false);
 
-                  onClearList();
-
-                  // Show a toast if you have a system, otherwise use alert as fallback
-                  if (typeof window !== "undefined" && "toast" in window) {
-                    // @ts-ignore
-                    window.toast.success("Shopping trip saved to Ledger! 🎉");
+                  if (success) {
+                    onClearList();
+                    toast({ title: "Shopping trip saved to Ledger! 🎉" });
+                    onGoToInventory();
                   } else {
-                    alert("Shopping trip saved to Ledger! 🎉");
+                    const msg = error instanceof Error ? error.message : String(error);
+                    const supabaseUnavailable = msg.includes("Supabase client not initialized");
+                    if (supabaseUnavailable) {
+                      addToLedger(purchasedItems);
+                      onClearList();
+                      toast({
+                        title: "Saved to local Ledger",
+                        description: "Connect Supabase to sync to the cloud.",
+                      });
+                      onGoToInventory();
+                    } else {
+                      toast({
+                        title: "Failed to save to Ledger",
+                        description: msg,
+                        variant: "destructive",
+                      });
+                    }
                   }
                 }}
-                className="gap-2 bg-success text-white"
+                disabled={isSaving}
+                className="w-full gap-2 bg-success text-white sm:w-auto"
                 variant="outline"
               >
-                Finish &amp; Save to Ledger
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : (
+                  "Finish & Save to Ledger"
+                )}
               </Button>
             )}
           </div>

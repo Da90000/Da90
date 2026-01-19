@@ -5,14 +5,15 @@ import { CheckCircle2, Circle, ShoppingBag } from "lucide-react";
 interface ShoppingProgressProps {
   totalItems: number;
   purchasedItems: number;
-  totalValue: number;
+  /** Sum of (item.basePrice * quantity) only. Does not change when user edits prices. */
+  originalBudget: number;
   purchasedValue: number;
 }
 
 export function ShoppingProgress({
   totalItems,
   purchasedItems,
-  totalValue,
+  originalBudget,
   purchasedValue,
 }: ShoppingProgressProps) {
   const progressPercent = totalItems > 0 ? (purchasedItems / totalItems) * 100 : 0;
@@ -75,8 +76,8 @@ export function ShoppingProgress({
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-4">
         <div>
-          <p className="text-sm text-muted-foreground">Estimated Total</p>
-          <p className="text-xl font-bold text-foreground">${totalValue.toFixed(2)}</p>
+          <p className="text-sm text-muted-foreground">Original Budget</p>
+          <p className="text-xl font-bold text-foreground">${originalBudget.toFixed(2)}</p>
         </div>
         <div className="text-right">
           <p className="text-sm text-muted-foreground">Purchased So Far</p>

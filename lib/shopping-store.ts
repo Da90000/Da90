@@ -121,13 +121,16 @@ export async function addToLedger(
   }
 
   // Map ShoppingListItem to ledger schema: item_name, category, quantity, amount
-  const payload = items.map((item) => ({
-    item_name: item.name,
-    category: item.category,
-    quantity: item.quantity,
-    amount: item.basePrice * item.quantity, // Total amount paid
-    created_at: new Date().toISOString(),
-  }));
+  const payload = items.map((item) => {
+    const price = item.manualPrice ?? item.basePrice;
+    return {
+      item_name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      amount: price * item.quantity,
+      created_at: new Date().toISOString(),
+    };
+  });
 
   const { data, error } = await supabase.from("ledger").insert(payload).select();
 
@@ -270,6 +273,19 @@ export function updateQuantity(id: string, quantity: number): void {
     item.quantity = Math.max(1, quantity);
     saveShoppingList(shoppingList);
   }
+}
+
+/** Updates only manualPrice. Does not touch basePrice. Pass undefined to clear the override. */
+export function updateItemPrice(id: string, price: number | undefined): void {
+  const shoppingList = getShoppingList();
+  const item = shoppingList.find((item) => item.id === id);
+  if (!item) return;
+  if (price === undefined) {
+    delete item.manualPrice;
+  } else if (Number.isFinite(price) && price >= 0) {
+    item.manualPrice = price;
+  }
+  saveShoppingList(shoppingList);
 }
 
 export function clearShoppingList(): void {
