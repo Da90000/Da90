@@ -1,10 +1,11 @@
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@/lib/supabase/client";
 
 export interface RecurringBill {
   id: string;
   name: string;
   amount: number;
-  day_of_month: number;
+  day_of_month: number; // Internal field name, maps to 'due_day' in database
+  category?: string; // Optional category field
 }
 
 export interface BillWithDue extends RecurringBill {
@@ -57,6 +58,7 @@ export function getDaysRemaining(due: Date): number {
  * and sorts by days remaining (soonest first).
  */
 export async function fetchBills(): Promise<BillWithDue[]> {
+  const supabase = createClient();
   if (!supabase) {
     console.warn("Supabase client not initialized. Skipping fetch.");
     return [];
@@ -64,8 +66,8 @@ export async function fetchBills(): Promise<BillWithDue[]> {
 
   const { data, error } = await supabase
     .from("recurring_bills")
-    .select("id, name, amount, day_of_month")
-    .order("day_of_month", { ascending: true });
+    .select("id, name, amount, due_day, category")
+    .order("due_day", { ascending: true });
 
   if (error) {
     const e = error as { message?: string; code?: string; details?: string; hint?: string };
@@ -79,7 +81,8 @@ export async function fetchBills(): Promise<BillWithDue[]> {
   if (!data || !Array.isArray(data)) return [];
 
   const withDue: BillWithDue[] = (data as Record<string, unknown>[]).map((row) => {
-    const day = Math.max(1, Math.min(31, Number(row.day_of_month) || 1));
+    // Map database column 'due_day' to internal 'day_of_month'
+    const day = Math.max(1, Math.min(31, Number(row.due_day || row.day_of_month) || 1));
     const amount = Number(row.amount) || 0;
     const nextDue = calculateNextDueDate(day);
     return {
@@ -87,6 +90,7 @@ export async function fetchBills(): Promise<BillWithDue[]> {
       name: String(row.name ?? ""),
       amount,
       day_of_month: day,
+      category: row.category ? String(row.category) : undefined,
       nextDue,
       daysRemaining: getDaysRemaining(nextDue),
     };
@@ -98,31 +102,114 @@ export async function fetchBills(): Promise<BillWithDue[]> {
 
 /**
  * Adds a new recurring bill to the recurring_bills table.
+ * Maps internal field names to database schema:
+ * - day_of_month -> due_day (database column)
+ * - category -> category (optional)
+ * - user_id is automatically added from authenticated session
  * Returns { success: true, error: null } on success, or { success: false, error } on failure.
  */
 export async function addBill(
   bill: Omit<RecurringBill, "id" | "created_at">
 ): Promise<{ success: boolean; error: unknown }> {
-  if (!supabase) {
-    return { success: false, error: new Error("Supabase client not initialized") };
+  try {
+    const supabase = createClient();
+    if (!supabase) {
+      return { success: false, error: new Error("Supabase client not initialized") };
+    }
+
+    // Check if user is authenticated and get user ID
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return {
+        success: false,
+        error: new Error("You must be logged in to add bills. Please sign in and try again."),
+      };
+    }
+
+    // Validate day_of_month
+    const dayOfMonth = Math.max(1, Math.min(31, bill.day_of_month || 1));
+    const amount = Number.isFinite(bill.amount) && bill.amount >= 0 ? bill.amount : 0;
+
+    // Map to database schema: due_day (not day_of_month), include category and user_id
+    const insertPayload: {
+      name: string;
+      amount: number;
+      due_day: number;
+      category?: string;
+      user_id?: string;
+    } = {
+      name: bill.name.trim(),
+      amount,
+      due_day: dayOfMonth, // CRITICAL: Database column is 'due_day', not 'day_of_month'
+    };
+
+    // Add category if provided
+    if (bill.category && bill.category.trim()) {
+      insertPayload.category = bill.category.trim();
+    }
+
+    // Add user_id from authenticated user
+    insertPayload.user_id = user.id;
+
+    const { data, error } = await supabase
+      .from("recurring_bills")
+      .insert(insertPayload)
+      .select();
+
+    if (error) {
+      // Improved error logging with JSON.stringify
+      console.error("Supabase Error:", JSON.stringify(error, null, 2));
+      
+      // Extract error details for user-friendly messages
+      const errorMessage = error.message || (error as any)?.message || "Unknown error";
+      const errorCode = error.code || (error as any)?.code || (error as any)?.statusCode || "unknown";
+      const errorDetails = (error as any)?.details || null;
+      const errorHint = (error as any)?.hint || null;
+      
+      // Check if it's an RLS policy error (common codes: 42501, PGRST301, etc.)
+      const isRLSError = 
+        errorCode === "42501" || 
+        errorCode === "PGRST301" ||
+        String(errorMessage)?.toLowerCase().includes("policy") || 
+        String(errorMessage)?.toLowerCase().includes("permission") ||
+        String(errorMessage)?.toLowerCase().includes("row-level security") ||
+        String(errorMessage)?.toLowerCase().includes("new row violates");
+      
+      if (isRLSError) {
+        return {
+          success: false,
+          error: new Error(
+            "Permission denied. Please ensure you have an INSERT policy for authenticated users on the recurring_bills table. " +
+            "Run this SQL in Supabase SQL Editor:\n\n" +
+            "CREATE POLICY \"Allow authenticated insert recurring_bills\" ON recurring_bills FOR INSERT TO authenticated WITH CHECK (true);"
+          ),
+        };
+      }
+      
+      // Return a user-friendly error message
+      const userMessage = errorMessage || errorDetails || errorHint || "Failed to add bill. Please check your connection and try again.";
+      return {
+        success: false,
+        error: new Error(userMessage),
+      };
+    }
+
+    if (!data || data.length === 0) {
+      return {
+        success: false,
+        error: new Error("Bill was created but no data was returned. Please refresh the page."),
+      };
+    }
+
+    return { success: true, error: null };
+  } catch (err) {
+    // Catch any unexpected errors
+    console.error("addBill unexpected error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
   }
-
-  // Validate day_of_month
-  const dayOfMonth = Math.max(1, Math.min(31, bill.day_of_month || 1));
-  const amount = Number.isFinite(bill.amount) && bill.amount >= 0 ? bill.amount : 0;
-
-  const { error } = await supabase.from("recurring_bills").insert({
-    name: bill.name.trim(),
-    amount,
-    day_of_month: dayOfMonth,
-  });
-
-  if (error) {
-    console.error("addBill error:", error);
-    return { success: false, error };
-  }
-
-  return { success: true, error: null };
 }
 
 /**
@@ -130,6 +217,7 @@ export async function addBill(
  * Returns true on success.
  */
 export async function logBillPayment(billName: string, amount: number): Promise<boolean> {
+  const supabase = createClient();
   if (!supabase) return false;
   const { error } = await supabase.from("ledger").insert({
     item_name: `${billName} (Recurring)`,

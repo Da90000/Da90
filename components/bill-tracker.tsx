@@ -143,6 +143,7 @@ export function BillTracker() {
         name: addName.trim(),
         amount,
         day_of_month: day,
+        category: addCategory.trim() || undefined,
       });
 
       if (success) {
@@ -156,8 +157,25 @@ export function BillTracker() {
         // Refresh the bills list
         await load();
       } else {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        toast({ title: "Failed to add bill", description: errorMsg, variant: "destructive" });
+        let errorMsg = "Failed to add bill";
+        if (error instanceof Error) {
+          errorMsg = error.message;
+        } else if (error && typeof error === "object") {
+          // Handle Supabase error objects
+          const supabaseError = error as { message?: string; code?: string; details?: string; hint?: string };
+          errorMsg = supabaseError.message || supabaseError.details || String(error);
+          if (supabaseError.code) {
+            errorMsg += ` (Code: ${supabaseError.code})`;
+          }
+        } else if (error) {
+          errorMsg = String(error);
+        }
+        toast({ 
+          title: "Failed to add bill", 
+          description: errorMsg, 
+          variant: "destructive",
+          duration: 10000, // Show longer for important errors
+        });
       }
     } finally {
       setAddSaving(false);

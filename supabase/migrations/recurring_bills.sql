@@ -8,9 +8,39 @@ CREATE TABLE IF NOT EXISTS recurring_bills (
   day_of_month smallint NOT NULL DEFAULT 1 CHECK (day_of_month >= 1 AND day_of_month <= 31)
 );
 
--- Optional: allow the anon role to read (adjust if you use RLS differently)
+-- Enable Row Level Security
 ALTER TABLE recurring_bills ENABLE ROW LEVEL SECURITY;
 
+-- Allow authenticated users to read all bills
+DROP POLICY IF EXISTS "Allow authenticated read recurring_bills" ON recurring_bills;
+CREATE POLICY "Allow authenticated read recurring_bills"
+  ON recurring_bills FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- Allow authenticated users to insert bills
+DROP POLICY IF EXISTS "Allow authenticated insert recurring_bills" ON recurring_bills;
+CREATE POLICY "Allow authenticated insert recurring_bills"
+  ON recurring_bills FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- Allow authenticated users to update their bills
+DROP POLICY IF EXISTS "Allow authenticated update recurring_bills" ON recurring_bills;
+CREATE POLICY "Allow authenticated update recurring_bills"
+  ON recurring_bills FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- Allow authenticated users to delete their bills
+DROP POLICY IF EXISTS "Allow authenticated delete recurring_bills" ON recurring_bills;
+CREATE POLICY "Allow authenticated delete recurring_bills"
+  ON recurring_bills FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- Legacy: Allow anon role to read (for backward compatibility, can be removed if not needed)
 DROP POLICY IF EXISTS "Allow anon read recurring_bills" ON recurring_bills;
 CREATE POLICY "Allow anon read recurring_bills"
   ON recurring_bills FOR SELECT
