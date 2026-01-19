@@ -32,10 +32,17 @@ function extractNameFromEmail(email: string | null | undefined): string {
   return namePart.charAt(0).toUpperCase() + namePart.slice(1);
 }
 
+function formatCurrency(value: number): string {
+  return `৳${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export function DashboardView({ onNavigate }: DashboardViewProps) {
   const supabase = createClient();
   const [stats, setStats] = useState<{
-    monthSpend: number;
+    totalIncome: number;
+    totalExpenses: number;
+    netBalance: number;
+    activeDebt: number;
     overdueCount: number;
     recentTx: LedgerEntry[];
   } | null>(null);
@@ -104,22 +111,30 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
 
       {/* Key Metrics: 2 cols mobile, 3 on desktop */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-        {/* Card 1: Finance */}
-        <Card className="overflow-hidden">
+        {/* Card 1: Current Balance */}
+        <Card className={`overflow-hidden ${
+          stats.netBalance >= 0
+            ? "border-emerald-500/40 bg-emerald-500/5"
+            : "border-destructive/60 bg-destructive/5"
+        }`}>
           <CardHeader className="pb-1">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {monthLabel} Spending
+              Current Balance
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1">
             <div className="flex items-baseline gap-2">
-              <span className="text-2xl font-bold tabular-nums text-foreground md:text-3xl">
-                ${stats.monthSpend.toFixed(2)}
+              <span className={`text-2xl font-bold tabular-nums md:text-3xl ${
+                stats.netBalance >= 0
+                  ? "text-emerald-700 dark:text-emerald-400"
+                  : "text-destructive"
+              }`}>
+                {formatCurrency(stats.netBalance)}
               </span>
-              {stats.monthSpend > 0 && (
-                <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-              )}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Income: {formatCurrency(stats.totalIncome)} | Expense: {formatCurrency(stats.totalExpenses)}
+            </p>
           </CardContent>
         </Card>
 
@@ -198,8 +213,12 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   <span className="min-w-0 flex-1 truncate font-medium text-foreground">
                     {t.itemName || "—"}
                   </span>
-                  <span className="shrink-0 font-semibold tabular-nums text-foreground">
-                    ${t.amount.toFixed(2)}
+                  <span className={`shrink-0 font-semibold tabular-nums ${
+                    t.transaction_type === "income"
+                      ? "text-emerald-700 dark:text-emerald-400"
+                      : "text-foreground"
+                  }`}>
+                    {t.transaction_type === "income" ? "+" : ""}{formatCurrency(t.amount)}
                   </span>
                 </li>
               ))}

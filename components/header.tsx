@@ -1,10 +1,13 @@
 "use client";
 
-import { CalendarClock, History, Home, LogOut, Package, PieChart, ShoppingCart, Wrench } from "lucide-react";
+import { useState } from "react";
+import { CalendarClock, History, Home, LogOut, Package, PieChart, Search, Settings, ShoppingCart, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ViewMode } from "@/lib/types";
 import { MobileNav } from "@/components/mobile-nav";
+import { GlobalSearch } from "@/components/global-search";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 
 interface HeaderProps {
@@ -16,6 +19,7 @@ interface HeaderProps {
 export function Header({ currentView, onViewChange, shoppingListCount }: HeaderProps) {
   const router = useRouter();
   const supabase = createClient();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -25,9 +29,14 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
 
   return (
     <>
+      <GlobalSearch
+        isOpen={searchOpen}
+        onOpenChange={setSearchOpen}
+        onNavigate={onViewChange}
+      />
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-14 md:h-16 items-center justify-between">
+          <div className="flex h-14 md:h-16 items-center justify-between gap-4">
             {/* Logo/Title — on mobile this is the only header content */}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent">
@@ -36,6 +45,22 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
               <span className="text-lg font-semibold tracking-tight text-foreground">
                 ShopList Pro
               </span>
+            </div>
+
+            {/* Desktop Search Bar — hidden on mobile */}
+            <div className="hidden md:flex flex-1 max-w-md mx-4">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="w-full relative"
+              >
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+                <Input
+                  placeholder="Search..."
+                  readOnly
+                  className="pl-10 cursor-pointer bg-secondary/50 hover:bg-secondary"
+                />
+              </button>
             </div>
 
             {/* Desktop nav — hidden on mobile (< md) */}
@@ -129,6 +154,18 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
                 <PieChart className="h-4 w-4" />
                 Analytics
               </button>
+              <button
+                type="button"
+                onClick={() => onViewChange("settings")}
+                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors active:scale-95 min-h-[44px] ${
+                  currentView === "settings"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Settings className="h-4 w-4" />
+                Settings
+              </button>
               <Button
                 type="button"
                 variant="ghost"
@@ -140,6 +177,16 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
                 Log Out
               </Button>
             </nav>
+
+            {/* Mobile Search Button — visible only on mobile */}
+            <button
+              type="button"
+              onClick={() => setSearchOpen(true)}
+              className="md:hidden flex items-center justify-center h-10 w-10 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              aria-label="Search"
+            >
+              <Search className="h-5 w-5" />
+            </button>
           </div>
         </div>
       </header>

@@ -4,6 +4,8 @@ import { supabase } from "@/lib/supabase";
 const LEDGER_KEY = "lifeos-central-ledger";
 const INVENTORY_KEY = "shoplist-inventory";
 
+export type TransactionType = "expense" | "income" | "debt_given" | "debt_taken";
+
 export interface LedgerEntry {
   id: string;
   date: string;
@@ -11,6 +13,9 @@ export interface LedgerEntry {
   category: string;
   amount: number; // Final price paid
   quantity: number;
+  transaction_type?: TransactionType;
+  entity_name?: string; // For debt: who gave/took the money
+  is_settled?: boolean; // For debt: whether it's been settled
 }
 
 export function getLedger(): LedgerEntry[] {
@@ -151,6 +156,7 @@ export async function saveToLedger(
       category: item.category,
       quantity: item.quantity,
       amount: Number.isFinite(amount) ? amount : 0,
+      transaction_type: "expense" as TransactionType,
       created_at: new Date().toISOString(),
     };
   });
@@ -170,6 +176,116 @@ export async function saveToLedger(
 
   // Also update local storage inventory prices
   updateLocalInventoryPrices(items);
+
+  return { success: true, error: null };
+}
+
+/**
+ * Adds a transaction to the ledger (expense, income, or debt).
+ * @param transaction - Transaction data including type and optional entity_name
+ * @returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function addTransaction(transaction: {
+  item_name: string;
+  category: string;
+  amount: number;
+  transaction_type: TransactionType;
+  entity_name?: string;
+  quantity?: number;
+}): Promise<{ success: boolean; error: unknown }> {
+  if (!supabase) {
+    return { success: false, error: new Error("Supabase client not initialized") };
+  }
+
+  const { error } = await supabase.from("ledger").insert({
+    item_name: transaction.item_name,
+    category: transaction.category,
+    amount: transaction.amount,
+    quantity: transaction.quantity ?? 1,
+    transaction_type: transaction.transaction_type,
+    entity_name: transaction.entity_name || null,
+    is_settled: transaction.transaction_type.startsWith("debt_") ? false : null,
+    created_at: new Date().toISOString(),
+  });
+
+  if (error) {
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
+}
+
+/**
+ * Fetches ledger entries from Supabase.
+ * @param filters - Optional filters for transaction type and settled status
+ * @returns Array of LedgerEntry objects
+ */
+export async function fetchLedger(filters?: {
+  transaction_type?: TransactionType;
+  is_settled?: boolean;
+}): Promise<LedgerEntry[]> {
+  if (!supabase) {
+    console.warn("Supabase client not initialized. Skipping fetch.");
+    return [];
+  }
+
+  let query = supabase
+    .from("ledger")
+    .select("id, created_at, item_name, category, amount, quantity, transaction_type, entity_name, is_settled")
+    .order("created_at", { ascending: false });
+
+  if (filters?.transaction_type) {
+    query = query.eq("transaction_type", filters.transaction_type);
+  }
+
+  if (filters?.is_settled !== undefined) {
+    if (filters.is_settled) {
+      query = query.eq("is_settled", true);
+    } else {
+      query = query.or("is_settled.is.null,is_settled.eq.false");
+    }
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    console.error("Ledger fetch error:", error);
+    return [];
+  }
+
+  if (!data) return [];
+
+  return data.map((row: any) => ({
+    id: String(row.id ?? ""),
+    date: String(row.created_at ?? ""),
+    itemName: String(row.item_name ?? ""),
+    category: String(row.category ?? ""),
+    amount: Number(row.amount) || 0,
+    quantity: Number(row.quantity) || 1,
+    transaction_type: row.transaction_type as TransactionType | undefined,
+    entity_name: row.entity_name ? String(row.entity_name) : undefined,
+    is_settled: row.is_settled === true,
+  }));
+}
+
+/**
+ * Settles a debt by marking it as settled.
+ * @param id - The ledger entry ID
+ * @returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function settleDebt(id: string): Promise<{ success: boolean; error: unknown }> {
+  if (!supabase) {
+    return { success: false, error: new Error("Supabase client not initialized") };
+  }
+
+  const { error } = await supabase
+    .from("ledger")
+    .update({ is_settled: true })
+    .eq("id", id);
+
+  if (error) {
+    return { success: false, error };
+  }
 
   return { success: true, error: null };
 }
