@@ -3,6 +3,7 @@ export interface InventoryItem {
   name: string;
   category: string;
   basePrice: number;
+  lastPaidPrice?: number; // Last price paid when purchased (optional)
   createdAt: Date;
 }
 
@@ -19,7 +20,7 @@ export interface ShoppingListItem {
   purchased: boolean;
 }
 
-export type ViewMode = "inventory" | "market" | "expenses" | "maintenance" | "dashboard" | "bills";
+export type ViewMode = "inventory" | "market" | "expenses" | "maintenance" | "dashboard" | "bills" | "analytics";
 
 export const CATEGORIES = [
   "Produce",

@@ -1,7 +1,9 @@
 "use client";
 
-import { CalendarClock, History, Home, Package, ShoppingCart, Wrench } from "lucide-react";
+import { CalendarClock, History, Home, LogOut, Package, PieChart, ShoppingCart, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { ViewMode } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 
 interface MobileNavProps {
   currentView: ViewMode;
@@ -14,6 +16,7 @@ const TABS: { view: ViewMode; icon: typeof Home; label: string }[] = [
   { view: "inventory", icon: Package, label: "Inventory" },
   { view: "market", icon: ShoppingCart, label: "Shop" },
   { view: "expenses", icon: History, label: "Expenses" },
+  { view: "analytics", icon: PieChart, label: "Analytics" },
   { view: "maintenance", icon: Wrench, label: "Maintenance" },
   { view: "bills", icon: CalendarClock, label: "Bills" },
 ];
@@ -23,6 +26,15 @@ export function MobileNav({
   onViewChange,
   shoppingListCount,
 }: MobileNavProps) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] supports-[backdrop-filter]:bg-background/80"
@@ -53,6 +65,15 @@ export function MobileNav({
           <span>{label}</span>
         </button>
       ))}
+      <button
+        type="button"
+        onClick={handleLogout}
+        className="flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 px-2 py-2 text-xs font-medium transition-all active:scale-95 text-muted-foreground"
+        aria-label="Log out"
+      >
+        <LogOut className="h-5 w-5" aria-hidden />
+        <span>Logout</span>
+      </button>
     </nav>
   );
 }

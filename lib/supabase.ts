@@ -1,12 +1,9 @@
-import { createClient } from '@supabase/supabase-js';
+// Legacy export for backward compatibility
+// New code should use @/lib/supabase/client or @/lib/supabase/server
+import { createClient as createBrowserClient } from '@/lib/supabase/client';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-if (!supabaseUrl || !supabaseKey) {
-  console.warn('Supabase environment variables are not set. Supabase sync will be disabled.');
-}
-
-export const supabase = supabaseUrl && supabaseKey 
-  ? createClient(supabaseUrl, supabaseKey)
-  : null as any; // Fallback for development
+// This is a client-side only export
+// For server-side operations, use @/lib/supabase/server
+export const supabase = typeof window !== 'undefined' 
+  ? createBrowserClient()
+  : null as any;

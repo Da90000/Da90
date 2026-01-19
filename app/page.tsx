@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { AnalyticsView } from "@/components/analytics-view";
 import { BillTracker } from "@/components/bill-tracker";
 import { DashboardView } from "@/components/dashboard-view";
 import { Header } from "@/components/header";
@@ -10,10 +12,12 @@ import { MasterInventory } from "@/components/master-inventory";
 import { MarketMode } from "@/components/market-mode";
 import { Spinner } from "@/components/ui/spinner";
 import type { ViewMode, InventoryItem, ShoppingListItem } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 import {
   getInventory,
   saveInventory,
   addInventoryItem,
+  updateInventoryItem,
   deleteInventoryItem,
   getShoppingList,
   addToShoppingList,
@@ -27,13 +31,37 @@ import {
 } from "@/lib/shopping-store";
 
 export default function ShopListApp() {
+  const router = useRouter();
+  const supabase = createClient();
   const [currentView, setCurrentView] = useState<ViewMode>("dashboard");
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [shoppingList, setShoppingList] = useState<ShoppingListItem[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
-  // Load data from database on mount
+  // Check authentication state on mount
   useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          router.push("/login");
+          return;
+        }
+        setIsCheckingAuth(false);
+      } catch (error) {
+        console.error("Failed to check auth:", error);
+        router.push("/login");
+      }
+    };
+
+    checkAuth();
+  }, [router, supabase.auth]);
+
+  // Load data from database on mount (only after auth is confirmed)
+  useEffect(() => {
+    if (isCheckingAuth) return;
+
     const loadData = async () => {
       try {
         const dbInventory = await fetchInventoryFromSupabase();
@@ -56,7 +84,7 @@ export default function ShopListApp() {
     };
     
     loadData();
-  }, []);
+  }, [isCheckingAuth]);
 
   // Inventory handlers
   const handleAddItem = useCallback(async (item: { name: string; category: string; basePrice: number }) => {
@@ -84,6 +112,24 @@ export default function ShopListApp() {
       // Fallback to local storage on error
       const newItem = addInventoryItem(item);
       setInventory((prev) => [...prev, newItem]);
+    }
+  }, []);
+
+  const handleEditItem = useCallback(async (id: string, updates: { name: string; category: string; basePrice: number }) => {
+    try {
+      // Update locally first for instant UI feedback
+      updateInventoryItem(id, updates);
+      
+      // Update the UI state
+      setInventory((prev) =>
+        prev.map((item) =>
+          item.id === id
+            ? { ...item, name: updates.name, category: updates.category, basePrice: updates.basePrice }
+            : item
+        )
+      );
+    } catch (error) {
+      console.error("Failed to update item:", error);
     }
   }, []);
 
@@ -147,12 +193,14 @@ export default function ShopListApp() {
     setCurrentView(mode);
   }, []);
 
-  if (!isLoaded) {
+  if (isCheckingAuth || !isLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Spinner className="h-8 w-8" />
-          <p className="text-muted-foreground">Loading inventory...</p>
+          <p className="text-muted-foreground">
+            {isCheckingAuth ? "Checking authentication..." : "Loading inventory..."}
+          </p>
         </div>
       </div>
     );
@@ -175,6 +223,7 @@ export default function ShopListApp() {
             inventory={inventory}
             shoppingList={shoppingList}
             onAddItem={handleAddItem}
+            onEditItem={handleEditItem}
             onDeleteItem={handleDeleteItem}
             onAddToCart={handleAddToCart}
           />
@@ -191,6 +240,7 @@ export default function ShopListApp() {
           />
         )}
         {currentView === "expenses" && <LedgerHistory />}
+        {currentView === "analytics" && <AnalyticsView />}
         {currentView === "maintenance" && <MaintenanceTracker />}
         {currentView === "bills" && <BillTracker />}
       </main>

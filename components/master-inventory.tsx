@@ -11,6 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddItemDialog } from "@/components/add-item-dialog";
+import { EditItemDialog } from "@/components/edit-item-dialog";
 import { InventoryItemCard } from "@/components/inventory-item-card";
 import type { InventoryItem, ShoppingListItem } from "@/lib/types";
 import { CATEGORIES } from "@/lib/types";
@@ -19,6 +20,7 @@ interface MasterInventoryProps {
   inventory: InventoryItem[];
   shoppingList: ShoppingListItem[];
   onAddItem: (item: { name: string; category: string; basePrice: number }) => void;
+  onEditItem: (id: string, updates: { name: string; category: string; basePrice: number }) => void;
   onDeleteItem: (id: string) => void;
   onAddToCart: (item: InventoryItem) => void;
 }
@@ -27,11 +29,13 @@ export function MasterInventory({
   inventory,
   shoppingList,
   onAddItem,
+  onEditItem,
   onDeleteItem,
   onAddToCart,
 }: MasterInventoryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   const cartItemIds = useMemo(
     () => new Set(shoppingList.map((item) => item.inventoryItemId)),
@@ -57,8 +61,23 @@ export function MasterInventory({
     return groups;
   }, [filteredInventory]);
 
+  const handleEdit = (item: InventoryItem) => {
+    setEditingItem(item);
+  };
+
+  const handleSaveEdit = (id: string, updates: { name: string; category: string; basePrice: number }) => {
+    onEditItem(id, updates);
+    setEditingItem(null);
+  };
+
   return (
     <div className="space-y-6">
+      <EditItemDialog
+        item={editingItem}
+        isOpen={editingItem !== null}
+        onClose={() => setEditingItem(null)}
+        onSave={handleSaveEdit}
+      />
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Master Inventory</h1>
@@ -115,6 +134,7 @@ export function MasterInventory({
                       key={item.id}
                       item={item}
                       onAddToCart={onAddToCart}
+                      onEdit={handleEdit}
                       onDelete={onDeleteItem}
                       isInCart={cartItemIds.has(item.id)}
                     />

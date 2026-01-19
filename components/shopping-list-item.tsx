@@ -4,7 +4,6 @@ import { useState } from "react";
 import { Minus, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { supabase } from "@/lib/supabase";
 import type { ShoppingListItem } from "@/lib/types";
 
 interface ShoppingListItemCardProps {
@@ -29,7 +28,8 @@ export function ShoppingListItemCard({
   const isHighIncrease = priceIncrease > 10;
   const itemTotal = localPrice * item.quantity;
 
-  // On blur: update manualPrice (or clear it). Never touch basePrice. Optionally sync to inventory.
+  // On blur: update manualPrice (or clear it). Never touch basePrice.
+  // manualPrice is only for the current shopping session, not for updating inventory.
   const handlePriceBlur = () => {
     const val = localPrice;
     if (!Number.isFinite(val) || val < 0) {
@@ -42,15 +42,9 @@ export function ShoppingListItemCard({
       return;
     }
     onUpdatePrice(item.id, val);
-    if (supabase) {
-      supabase
-        .from("inventory")
-        .update({ base_price: val })
-        .eq("id", item.inventoryItemId)
-        .then(({ error }) => {
-          if (error) console.error("Failed to update inventory base price:", error);
-        });
-    }
+    // Note: We do NOT update inventory base_price here.
+    // Base price should only be updated through the Edit Item dialog.
+    // The last_paid_price will be updated when finishing shopping.
   };
 
   return (

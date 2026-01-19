@@ -1,8 +1,11 @@
 "use client";
 
-import { CalendarClock, History, Home, Package, ShoppingCart, Wrench } from "lucide-react";
+import { CalendarClock, History, Home, LogOut, Package, PieChart, ShoppingCart, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { ViewMode } from "@/lib/types";
 import { MobileNav } from "@/components/mobile-nav";
+import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
 
 interface HeaderProps {
   currentView: ViewMode;
@@ -11,6 +14,15 @@ interface HeaderProps {
 }
 
 export function Header({ currentView, onViewChange, shoppingListCount }: HeaderProps) {
+  const router = useRouter();
+  const supabase = createClient();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/login");
+    router.refresh();
+  };
+
   return (
     <>
       <header className="sticky top-0 z-50 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -105,6 +117,28 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
                 <CalendarClock className="h-4 w-4" />
                 Bills
               </button>
+              <button
+                type="button"
+                onClick={() => onViewChange("analytics")}
+                className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors active:scale-95 min-h-[44px] ${
+                  currentView === "analytics"
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <PieChart className="h-4 w-4" />
+                Analytics
+              </button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="flex items-center gap-2 text-muted-foreground hover:text-foreground min-h-[44px]"
+              >
+                <LogOut className="h-4 w-4" />
+                Log Out
+              </Button>
             </nav>
           </div>
         </div>
