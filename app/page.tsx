@@ -73,7 +73,6 @@ export default function ShopListApp() {
           // Fallback to localStorage if database is empty
           setInventory(getInventory());
         }
-        setShoppingList(getShoppingList());
       } catch (error) {
         console.error("Failed to load inventory from database:", error);
         // Fallback to localStorage on error
@@ -81,6 +80,10 @@ export default function ShopListApp() {
       } finally {
         setIsLoaded(true);
       }
+      
+      // Always load shopping list from localStorage, regardless of database fetch success/failure
+      // This ensures shopping list is restored even if database fetch fails
+      setShoppingList(getShoppingList());
     };
     
     loadData();
