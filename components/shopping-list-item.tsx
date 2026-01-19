@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Minus, Plus, Trash2, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -23,14 +23,28 @@ export function ShoppingListItemCard({
 }: ShoppingListItemCardProps) {
   const effectivePrice = item.manualPrice ?? item.basePrice;
   const [localPrice, setLocalPrice] = useState<number>(effectivePrice);
+  const [isInputFocused, setIsInputFocused] = useState(false);
 
-  const priceIncrease = item.basePrice ? ((localPrice - item.basePrice) / item.basePrice) * 100 : 0;
+  // Sync localPrice with item.manualPrice when the item prop changes
+  // This ensures the input reflects the persisted value after remounts or external updates
+  // Only sync if the input is not currently focused (to avoid interrupting user typing)
+  useEffect(() => {
+    if (!isInputFocused) {
+      const currentEffectivePrice = item.manualPrice ?? item.basePrice;
+      setLocalPrice(currentEffectivePrice);
+    }
+  }, [item.manualPrice, item.basePrice, item.id, isInputFocused]);
+
+  // Use persisted value for calculations to ensure consistency with stored data
+  const calculatedPrice = item.manualPrice ?? item.basePrice;
+  const priceIncrease = item.basePrice ? ((calculatedPrice - item.basePrice) / item.basePrice) * 100 : 0;
   const isHighIncrease = priceIncrease > 10;
-  const itemTotal = localPrice * item.quantity;
+  const itemTotal = calculatedPrice * item.quantity;
 
   // On blur: update manualPrice (or clear it). Never touch basePrice.
   // manualPrice is only for the current shopping session, not for updating inventory.
   const handlePriceBlur = () => {
+    setIsInputFocused(false);
     const val = localPrice;
     if (!Number.isFinite(val) || val < 0) {
       setLocalPrice(item.basePrice);
@@ -41,10 +55,15 @@ export function ShoppingListItemCard({
       onUpdatePrice(item.id, undefined);
       return;
     }
+    // Persist the price change immediately
     onUpdatePrice(item.id, val);
     // Note: We do NOT update inventory base_price here.
     // Base price should only be updated through the Edit Item dialog.
     // The last_paid_price will be updated when finishing shopping.
+  };
+
+  const handlePriceFocus = () => {
+    setIsInputFocused(true);
   };
 
   return (
@@ -84,6 +103,7 @@ export function ShoppingListItemCard({
                   inputMode="decimal"
                   value={localPrice}
                   onChange={(e) => setLocalPrice(Number(e.target.value))}
+                  onFocus={handlePriceFocus}
                   onBlur={handlePriceBlur}
                   className={`min-h-[44px] w-20 rounded border bg-transparent px-2 text-base tabular-nums focus:outline-none focus:ring-2 focus:ring-ring md:w-16 md:min-h-0 md:border-0 md:border-b md:border-dashed md:px-0 md:text-xs ${
                     isHighIncrease ? "text-destructive border-destructive font-bold md:border-destructive" : "border-input md:border-muted-foreground"
