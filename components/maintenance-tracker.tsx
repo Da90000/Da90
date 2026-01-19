@@ -457,11 +457,16 @@ export function MaintenanceTracker() {
 
   const sortedItems = useMemo(() => {
     return [...items].sort((a, b) => {
+      // Always put overdue items first (strictly)
       const da = getDaysOverdue(a.last_service_date, a.service_interval_days);
       const db = getDaysOverdue(b.last_service_date, b.service_interval_days);
+      // Overdue items come first
       if (da > 0 && db <= 0) return -1;
       if (da <= 0 && db > 0) return 1;
+      // Among overdue items, sort by most overdue first
       if (da > 0 && db > 0) return db - da;
+      // Among healthy items, sort by days remaining (soonest first)
+      if (da <= 0 && db <= 0) return da - db;
       return 0;
     });
   }, [items]);

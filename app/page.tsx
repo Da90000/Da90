@@ -10,6 +10,7 @@ import { LedgerHistory } from "@/components/ledger-history";
 import { MaintenanceTracker } from "@/components/maintenance-tracker";
 import { MasterInventory } from "@/components/master-inventory";
 import { MarketMode } from "@/components/market-mode";
+import { SettingsView } from "@/components/settings-view";
 import { Spinner } from "@/components/ui/spinner";
 import type { ViewMode, InventoryItem, ShoppingListItem } from "@/lib/types";
 import { createClient } from "@/lib/supabase/client";
@@ -246,6 +247,7 @@ export default function ShopListApp() {
         {currentView === "analytics" && <AnalyticsView />}
         {currentView === "maintenance" && <MaintenanceTracker />}
         {currentView === "bills" && <BillTracker />}
+        {currentView === "settings" && <SettingsView />}
       </main>
     </div>
   );

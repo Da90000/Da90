@@ -17,7 +17,10 @@ function toLedgerEntry(row: Record<string, unknown>): LedgerEntry {
     itemName: String(row.item_name ?? ""),
     category: String(row.category ?? ""),
     amount: Number(row.amount) || 0,
-    quantity: Number(row.quantity) || 0,
+    quantity: Number(row.quantity) || 1,
+    transaction_type: row.transaction_type as "expense" | "income" | "debt_given" | "debt_taken" | undefined,
+    entity_name: row.entity_name ? String(row.entity_name) : undefined,
+    is_settled: row.is_settled === true,
   };
 }
 
@@ -30,17 +33,21 @@ function getCurrentMonthRange(): { start: string; end: string } {
 }
 
 /**
- * Fetches dashboard stats via three parallel queries:
- * 1. Spending: ledger for current month, sum of amount
- * 2. Maintenance: maintenance_items, count where getDaysOverdue > 0
- * 3. Recent Activity: 5 most recent ledger entries
+ * Fetches dashboard stats via parallel queries:
+ * 1. Finance: ledger for current month, calculate income, expenses, net balance
+ * 2. Debt: active (unsettled) debts
+ * 3. Maintenance: maintenance_items, count where getDaysOverdue > 0
+ * 4. Recent Activity: 5 most recent ledger entries
  */
 export async function fetchDashboardStats(): Promise<{
-  monthSpend: number;
+  totalIncome: number;
+  totalExpenses: number;
+  netBalance: number;
+  activeDebt: number;
   overdueCount: number;
   recentTx: LedgerEntry[];
 }> {
-  const empty = { monthSpend: 0, overdueCount: 0, recentTx: [] };
+  const empty = { totalIncome: 0, totalExpenses: 0, netBalance: 0, activeDebt: 0, overdueCount: 0, recentTx: [] };
 
   if (!supabase) {
     console.warn("Supabase client not initialized. Skipping fetch.");
@@ -49,28 +56,62 @@ export async function fetchDashboardStats(): Promise<{
 
   const { start, end } = getCurrentMonthRange();
 
-  const [spendingRes, maintenanceRes, recentRes] = await Promise.all([
+  const [ledgerRes, debtRes, maintenanceRes, recentRes] = await Promise.all([
     supabase
       .from("ledger")
-      .select("amount")
+      .select("amount, transaction_type")
       .gte("created_at", start)
       .lte("created_at", end),
+    supabase
+      .from("ledger")
+      .select("amount, transaction_type")
+      .in("transaction_type", ["debt_given", "debt_taken"])
+      .or("is_settled.is.null,is_settled.eq.false"),
     supabase
       .from("maintenance_items")
       .select("id, last_service_date, service_interval_days"),
     supabase
       .from("ledger")
-      .select("id, created_at, item_name, category, amount, quantity")
+      .select("id, created_at, item_name, category, amount, quantity, transaction_type")
       .order("created_at", { ascending: false })
       .limit(5),
   ]);
 
-  let monthSpend = 0;
-  if (!spendingRes.error && spendingRes.data) {
-    const rows = spendingRes.data as { amount?: number }[];
-    monthSpend = rows.reduce((sum, r) => sum + (Number(r.amount) || 0), 0);
-  } else if (spendingRes.error) {
-    console.error("Dashboard spending fetch error:", spendingRes.error);
+  // Calculate income and expenses
+  let totalIncome = 0;
+  let totalExpenses = 0;
+  if (!ledgerRes.error && ledgerRes.data) {
+    const rows = ledgerRes.data as { amount?: number; transaction_type?: string }[];
+    for (const row of rows) {
+      const amount = Number(row.amount) || 0;
+      const type = row.transaction_type || "expense";
+      if (type === "income") {
+        totalIncome += amount;
+      } else if (type === "expense") {
+        totalExpenses += amount;
+      }
+    }
+  } else if (ledgerRes.error) {
+    console.error("Dashboard ledger fetch error:", ledgerRes.error);
+  }
+
+  const netBalance = totalIncome - totalExpenses;
+
+  // Calculate active debt
+  let activeDebt = 0;
+  if (!debtRes.error && debtRes.data) {
+    const rows = debtRes.data as { amount?: number; transaction_type?: string }[];
+    for (const row of rows) {
+      const amount = Number(row.amount) || 0;
+      const type = row.transaction_type || "";
+      if (type === "debt_given") {
+        activeDebt += amount; // Money given out (positive)
+      } else if (type === "debt_taken") {
+        activeDebt -= amount; // Money borrowed (negative)
+      }
+    }
+  } else if (debtRes.error) {
+    console.error("Dashboard debt fetch error:", debtRes.error);
   }
 
   let overdueCount = 0;
@@ -90,7 +131,7 @@ export async function fetchDashboardStats(): Promise<{
     console.error("Dashboard recent ledger fetch error:", recentRes.error);
   }
 
-  return { monthSpend, overdueCount, recentTx };
+  return { totalIncome, totalExpenses, netBalance, activeDebt, overdueCount, recentTx };
 }
 
 /**

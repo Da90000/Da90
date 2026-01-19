@@ -20,7 +20,7 @@ export interface ShoppingListItem {
   purchased: boolean;
 }
 
-export type ViewMode = "inventory" | "market" | "expenses" | "maintenance" | "dashboard" | "bills" | "analytics";
+export type ViewMode = "inventory" | "market" | "expenses" | "maintenance" | "dashboard" | "bills" | "analytics" | "settings";
 
 export const CATEGORIES = [
   "Produce",

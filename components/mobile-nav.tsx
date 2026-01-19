@@ -1,8 +1,10 @@
 "use client";
 
-import { CalendarClock, History, Home, LogOut, Package, PieChart, ShoppingCart, Wrench } from "lucide-react";
+import { useState } from "react";
+import { CalendarClock, History, Home, LogOut, Package, PieChart, Search, Settings, ShoppingCart, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ViewMode } from "@/lib/types";
+import { GlobalSearch } from "@/components/global-search";
 import { createClient } from "@/lib/supabase/client";
 
 interface MobileNavProps {
@@ -19,6 +21,7 @@ const TABS: { view: ViewMode; icon: typeof Home; label: string }[] = [
   { view: "analytics", icon: PieChart, label: "Analytics" },
   { view: "maintenance", icon: Wrench, label: "Maintenance" },
   { view: "bills", icon: CalendarClock, label: "Bills" },
+  { view: "settings", icon: Settings, label: "Settings" },
 ];
 
 export function MobileNav({
@@ -28,6 +31,7 @@ export function MobileNav({
 }: MobileNavProps) {
   const router = useRouter();
   const supabase = createClient();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -36,11 +40,17 @@ export function MobileNav({
   };
 
   return (
-    <nav
-      className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] supports-[backdrop-filter]:bg-background/80"
-      role="navigation"
-      aria-label="Main"
-    >
+    <>
+      <GlobalSearch
+        isOpen={searchOpen}
+        onOpenChange={setSearchOpen}
+        onNavigate={onViewChange}
+      />
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] supports-[backdrop-filter]:bg-background/80"
+        role="navigation"
+        aria-label="Main"
+      >
       {TABS.map(({ view, icon: Icon, label }) => (
         <button
           key={view}
@@ -67,6 +77,19 @@ export function MobileNav({
       ))}
       <button
         type="button"
+        onClick={() => setSearchOpen(true)}
+        className={`flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 px-2 py-2 text-xs font-medium transition-all active:scale-95 ${
+          searchOpen
+            ? "text-primary"
+            : "text-muted-foreground"
+        }`}
+        aria-label="Search"
+      >
+        <Search className="h-5 w-5" aria-hidden />
+        <span>Search</span>
+      </button>
+      <button
+        type="button"
         onClick={handleLogout}
         className="flex min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 px-2 py-2 text-xs font-medium transition-all active:scale-95 text-muted-foreground"
         aria-label="Log out"
@@ -75,5 +98,6 @@ export function MobileNav({
         <span>Logout</span>
       </button>
     </nav>
+    </>
   );
 }

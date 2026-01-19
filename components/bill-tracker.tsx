@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { format } from "date-fns";
 import {
   CreditCard,
@@ -10,6 +10,10 @@ import {
   Smartphone,
   Zap,
   CheckCircle2,
+  Wifi,
+  Flame,
+  Clapperboard,
+  PlayCircle,
 } from "lucide-react";
 import {
   fetchBills,
@@ -39,11 +43,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-function getBillIcon(name: string) {
+function getBillIcon(name: string, category?: string) {
   const n = name.toLowerCase();
-  if (/rent|mortgage|housing|lease/.test(n)) return Home;
-  if (/electric|gas|water|utility|utilities/.test(n)) return Zap;
-  if (/internet|phone|mobile|broadband|streaming/.test(n)) return Smartphone;
+  const cat = category?.toLowerCase() || "";
+  
+  // Smart icon matching based on name or category
+  if (/net|wifi|internet|broadband/.test(n) || cat.includes("internet")) return Wifi;
+  if (/gas|fuel/.test(n) || cat.includes("gas")) return Flame;
+  if (/netflix|prime|spotify|disney|hulu|hbo|streaming/.test(n) || cat.includes("streaming")) return Clapperboard;
+  if (/rent|mortgage|housing|lease|house/.test(n) || cat.includes("rent")) return Home;
+  if (/electric|water|utility|utilities/.test(n) || cat.includes("utility")) return Zap;
+  if (/phone|mobile|cellular/.test(n)) return Smartphone;
+  
   return CreditCard;
 }
 
@@ -55,16 +66,16 @@ function borderClass(daysRemaining: number, paid: boolean): string {
 }
 
 function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(value);
+  // Format as Taka (৳) with proper number formatting
+  return `৳${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+type BillSortOption = "due-date" | "amount-high" | "alphabetical";
 
 export function BillTracker() {
   const [bills, setBills] = useState<BillWithDue[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sortBy, setSortBy] = useState<BillSortOption>("due-date");
   const [paidThisSession, setPaidThisSession] = useState<Set<string>>(new Set());
   const [payOpen, setPayOpen] = useState(false);
   const [payBill, setPayBill] = useState<BillWithDue | null>(null);
@@ -91,6 +102,21 @@ export function BillTracker() {
   }, [load]);
 
   const totalMonthly = bills.reduce((sum, b) => sum + b.amount, 0);
+
+  // Sort bills based on selected option
+  const sortedBills = useMemo(() => {
+    const sorted = [...bills];
+    switch (sortBy) {
+      case "due-date":
+        return sorted.sort((a, b) => a.daysRemaining - b.daysRemaining);
+      case "amount-high":
+        return sorted.sort((a, b) => b.amount - a.amount);
+      case "alphabetical":
+        return sorted.sort((a, b) => a.name.localeCompare(b.name));
+      default:
+        return sorted;
+    }
+  }, [bills, sortBy]);
 
   const handleMarkPaidClick = (bill: BillWithDue) => {
     setPayBill(bill);
@@ -212,15 +238,27 @@ export function BillTracker() {
             </p>
             <p className="mt-1 text-sm text-muted-foreground">Total burn rate per month</p>
           </div>
-          <Button
-            onClick={() => setAddOpen(true)}
-            size="sm"
-            className="shrink-0 gap-2"
-          >
-            <Plus className="h-4 w-4 md:hidden" />
-            <span className="hidden md:inline">Add Subscription</span>
-            <Plus className="hidden h-4 w-4 md:inline" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={(value) => setSortBy(value as BillSortOption)}>
+              <SelectTrigger className="w-[180px] bg-input">
+                <SelectValue placeholder="Sort By" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="due-date">Due Date (Soonest)</SelectItem>
+                <SelectItem value="amount-high">Amount (Highest)</SelectItem>
+                <SelectItem value="alphabetical">Alphabetical</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              onClick={() => setAddOpen(true)}
+              size="sm"
+              className="shrink-0 gap-2"
+            >
+              <Plus className="h-4 w-4 md:hidden" />
+              <span className="hidden md:inline">Add Subscription</span>
+              <Plus className="hidden h-4 w-4 md:inline" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -239,8 +277,8 @@ export function BillTracker() {
             </CardContent>
           </Card>
         ) : (
-          bills.map((bill) => {
-            const Icon = getBillIcon(bill.name);
+          sortedBills.map((bill) => {
+            const Icon = getBillIcon(bill.name, bill.category);
             const paid = paidThisSession.has(bill.id);
             return (
               <Card
@@ -259,13 +297,13 @@ export function BillTracker() {
                         </p>
                         <Badge
                           variant="secondary"
-                          className="mt-1 text-[10px] font-medium"
+                          className="mt-1 bg-secondary/50 text-[10px] font-medium"
                         >
                           Due {format(bill.nextDue, "MMM d")}
                         </Badge>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between gap-3 sm:justify-end">
+                    <div className="flex items-center justify-between gap-3 sm:justify-end sm:items-center">
                       <span className={`text-lg font-semibold tabular-nums ${paid ? "text-muted-foreground" : "text-foreground"}`}>
                         {formatCurrency(bill.amount)}
                       </span>
@@ -309,7 +347,7 @@ export function BillTracker() {
               </p>
             )}
             <div className="space-y-2">
-              <Label htmlFor="pay-amount">Amount ($)</Label>
+              <Label htmlFor="pay-amount">Amount (৳)</Label>
               <Input
                 id="pay-amount"
                 type="number"

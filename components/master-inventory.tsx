@@ -25,6 +25,8 @@ interface MasterInventoryProps {
   onAddToCart: (item: InventoryItem) => void;
 }
 
+type SortOption = "name" | "price-high" | "last-paid-high" | "category";
+
 export function MasterInventory({
   inventory,
   shoppingList,
@@ -35,6 +37,7 @@ export function MasterInventory({
 }: MasterInventoryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortOption>("name");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
 
   const cartItemIds = useMemo(
@@ -43,12 +46,35 @@ export function MasterInventory({
   );
 
   const filteredInventory = useMemo(() => {
-    return inventory.filter((item) => {
+    let filtered = inventory.filter((item) => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
       const matchesCategory = selectedCategory === "all" || item.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
-  }, [inventory, searchQuery, selectedCategory]);
+
+    // Apply sorting
+    const sorted = [...filtered].sort((a, b) => {
+      switch (sortBy) {
+        case "name":
+          return a.name.localeCompare(b.name);
+        case "price-high":
+          return b.basePrice - a.basePrice;
+        case "last-paid-high":
+          const aPrice = a.lastPaidPrice ?? 0;
+          const bPrice = b.lastPaidPrice ?? 0;
+          return bPrice - aPrice;
+        case "category":
+          if (a.category !== b.category) {
+            return a.category.localeCompare(b.category);
+          }
+          return a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+
+    return sorted;
+  }, [inventory, searchQuery, selectedCategory, sortBy]);
 
   const groupedInventory = useMemo(() => {
     const groups: Record<string, InventoryItem[]> = {};
@@ -111,6 +137,17 @@ export function MasterInventory({
               ))}
             </SelectContent>
           </Select>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as SortOption)}>
+            <SelectTrigger className="w-[180px] bg-input">
+              <SelectValue placeholder="Sort By" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="name">Name (A-Z)</SelectItem>
+              <SelectItem value="price-high">Price (High to Low)</SelectItem>
+              <SelectItem value="last-paid-high">Last Paid (High to Low)</SelectItem>
+              <SelectItem value="category">Category</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
@@ -121,27 +158,44 @@ export function MasterInventory({
         </div>
       ) : (
         <div className="space-y-8">
-          {Object.entries(groupedInventory)
-            .sort(([a], [b]) => a.localeCompare(b))
-            .map(([category, items]) => (
-              <div key={category}>
-                <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                  {category}
-                </h2>
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-                  {items.map((item) => (
-                    <InventoryItemCard
-                      key={item.id}
-                      item={item}
-                      onAddToCart={onAddToCart}
-                      onEdit={handleEdit}
-                      onDelete={onDeleteItem}
-                      isInCart={cartItemIds.has(item.id)}
-                    />
-                  ))}
+          {sortBy === "category" ? (
+            // Group by category when sorting by category
+            Object.entries(groupedInventory)
+              .sort(([a], [b]) => a.localeCompare(b))
+              .map(([category, items]) => (
+                <div key={category}>
+                  <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                    {category}
+                  </h2>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {items.map((item) => (
+                      <InventoryItemCard
+                        key={item.id}
+                        item={item}
+                        onAddToCart={onAddToCart}
+                        onEdit={handleEdit}
+                        onDelete={onDeleteItem}
+                        isInCart={cartItemIds.has(item.id)}
+                      />
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))
+          ) : (
+            // Flat list when sorting by other criteria
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredInventory.map((item) => (
+                <InventoryItemCard
+                  key={item.id}
+                  item={item}
+                  onAddToCart={onAddToCart}
+                  onEdit={handleEdit}
+                  onDelete={onDeleteItem}
+                  isInCart={cartItemIds.has(item.id)}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 
