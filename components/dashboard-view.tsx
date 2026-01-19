@@ -8,6 +8,7 @@ import type { ViewMode } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { createClient } from "@/lib/supabase/client";
 
 interface DashboardViewProps {
   onNavigate: (mode: ViewMode) => void;
@@ -24,13 +25,40 @@ function getMonthName(): string {
   return format(new Date(), "MMMM");
 }
 
+function extractNameFromEmail(email: string | null | undefined): string {
+  if (!email) return "";
+  const namePart = email.split("@")[0];
+  // Capitalize first letter
+  return namePart.charAt(0).toUpperCase() + namePart.slice(1);
+}
+
 export function DashboardView({ onNavigate }: DashboardViewProps) {
+  const supabase = createClient();
   const [stats, setStats] = useState<{
     monthSpend: number;
     overdueCount: number;
     recentTx: LedgerEntry[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userLoading, setUserLoading] = useState(true);
+
+  // Fetch user details
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        setUserEmail(user?.email || null);
+      } catch (error) {
+        console.error("Failed to fetch user:", error);
+        setUserEmail(null);
+      } finally {
+        setUserLoading(false);
+      }
+    };
+
+    fetchUser();
+  }, [supabase.auth]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -50,12 +78,26 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const monthLabel = getMonthName();
   const dateLabel = format(new Date(), "EEEE, MMM d");
 
+  const greeting = getGreeting();
+  const userName = extractNameFromEmail(userEmail);
+  const greetingText = userLoading 
+    ? greeting 
+    : userName 
+      ? `${greeting}, ${userName}`
+      : userEmail
+        ? `${greeting}, ${userEmail}`
+        : greeting;
+
   return (
     <div className="space-y-6">
       {/* Header: Greeting + Date */}
       <header>
         <h1 className="text-xl font-semibold tracking-tight text-foreground md:text-2xl">
-          {getGreeting()}
+          {userLoading ? (
+            <Skeleton className="inline-block h-7 w-48 md:h-8 md:w-64" />
+          ) : (
+            greetingText
+          )}
         </h1>
         <p className="text-sm text-muted-foreground">{dateLabel}</p>
       </header>
