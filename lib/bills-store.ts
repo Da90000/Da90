@@ -97,6 +97,35 @@ export async function fetchBills(): Promise<BillWithDue[]> {
 }
 
 /**
+ * Adds a new recurring bill to the recurring_bills table.
+ * Returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function addBill(
+  bill: Omit<RecurringBill, "id" | "created_at">
+): Promise<{ success: boolean; error: unknown }> {
+  if (!supabase) {
+    return { success: false, error: new Error("Supabase client not initialized") };
+  }
+
+  // Validate day_of_month
+  const dayOfMonth = Math.max(1, Math.min(31, bill.day_of_month || 1));
+  const amount = Number.isFinite(bill.amount) && bill.amount >= 0 ? bill.amount : 0;
+
+  const { error } = await supabase.from("recurring_bills").insert({
+    name: bill.name.trim(),
+    amount,
+    day_of_month: dayOfMonth,
+  });
+
+  if (error) {
+    console.error("addBill error:", error);
+    return { success: false, error };
+  }
+
+  return { success: true, error: null };
+}
+
+/**
  * Inserts a bill payment into the ledger (category: "Bill", item_name includes "Recurring").
  * Returns true on success.
  */

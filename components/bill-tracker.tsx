@@ -6,12 +6,14 @@ import {
   CreditCard,
   Home,
   Loader2,
+  Plus,
   Smartphone,
   Zap,
   CheckCircle2,
 } from "lucide-react";
 import {
   fetchBills,
+  addBill,
   logBillPayment,
   type BillWithDue,
 } from "@/lib/bills-store";
@@ -29,6 +31,13 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 function getBillIcon(name: string) {
   const n = name.toLowerCase();
@@ -61,6 +70,14 @@ export function BillTracker() {
   const [payBill, setPayBill] = useState<BillWithDue | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [paySaving, setPaySaving] = useState(false);
+  
+  // Add Bill Dialog State
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState("");
+  const [addAmount, setAddAmount] = useState("");
+  const [addDay, setAddDay] = useState("");
+  const [addCategory, setAddCategory] = useState("");
+  const [addSaving, setAddSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -104,6 +121,49 @@ export function BillTracker() {
     }
   };
 
+  const handleAddBill = async () => {
+    if (!addName.trim()) {
+      toast({ title: "Enter a bill name", variant: "destructive" });
+      return;
+    }
+    const amount = Number.parseFloat(addAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    const day = Number.parseInt(addDay);
+    if (!Number.isFinite(day) || day < 1 || day > 31) {
+      toast({ title: "Enter a valid day (1-31)", variant: "destructive" });
+      return;
+    }
+
+    setAddSaving(true);
+    try {
+      const { success, error } = await addBill({
+        name: addName.trim(),
+        amount,
+        day_of_month: day,
+      });
+
+      if (success) {
+        toast({ title: "Bill added successfully" });
+        // Reset form
+        setAddName("");
+        setAddAmount("");
+        setAddDay("");
+        setAddCategory("");
+        setAddOpen(false);
+        // Refresh the bills list
+        await load();
+      } else {
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        toast({ title: "Failed to add bill", description: errorMsg, variant: "destructive" });
+      }
+    } finally {
+      setAddSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -124,13 +184,26 @@ export function BillTracker() {
     <div className="space-y-6">
       {/* Header: Title + Total Monthly Sum (prominent) */}
       <header>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">
-          Monthly Fixed Costs
-        </h1>
-        <p className="mt-1 text-4xl font-bold tabular-nums text-foreground md:text-5xl">
-          {formatCurrency(totalMonthly)}
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">Total burn rate per month</p>
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">
+              Monthly Fixed Costs
+            </h1>
+            <p className="mt-1 text-4xl font-bold tabular-nums text-foreground md:text-5xl">
+              {formatCurrency(totalMonthly)}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">Total burn rate per month</p>
+          </div>
+          <Button
+            onClick={() => setAddOpen(true)}
+            size="sm"
+            className="shrink-0 gap-2"
+          >
+            <Plus className="h-4 w-4 md:hidden" />
+            <span className="hidden md:inline">Add Subscription</span>
+            <Plus className="hidden h-4 w-4 md:inline" />
+          </Button>
+        </div>
       </header>
 
       {/* Bill cards: mobile-first stack */}
@@ -246,6 +319,101 @@ export function BillTracker() {
                 </>
               ) : (
                 "Paid & Log"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Bill Dialog */}
+      <Dialog
+        open={addOpen}
+        onOpenChange={(open) => {
+          if (!open && !addSaving) {
+            setAddName("");
+            setAddAmount("");
+            setAddDay("");
+            setAddCategory("");
+          }
+          setAddOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Track New Bill</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="add-name">Name</Label>
+              <Input
+                id="add-name"
+                placeholder="e.g., Netflix"
+                value={addName}
+                onChange={(e) => setAddName(e.target.value)}
+                disabled={addSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-amount">Amount</Label>
+              <Input
+                id="add-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g., 1200"
+                value={addAmount}
+                onChange={(e) => setAddAmount(e.target.value)}
+                disabled={addSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-day">Day of Month</Label>
+              <Input
+                id="add-day"
+                type="number"
+                min="1"
+                max="31"
+                placeholder="e.g., 5"
+                value={addDay}
+                onChange={(e) => setAddDay(e.target.value)}
+                disabled={addSaving}
+              />
+              <p className="text-xs text-muted-foreground">Enter a day between 1 and 31</p>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-category">Category (Optional)</Label>
+              <Select value={addCategory} onValueChange={setAddCategory} disabled={addSaving}>
+                <SelectTrigger id="add-category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Utility">Utility</SelectItem>
+                  <SelectItem value="Subscription">Subscription</SelectItem>
+                  <SelectItem value="Rent">Rent</SelectItem>
+                  <SelectItem value="Insurance">Insurance</SelectItem>
+                  <SelectItem value="Loan">Loan</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setAddOpen(false)}
+              disabled={addSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAddBill} disabled={addSaving}>
+              {addSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving…
+                </>
+              ) : (
+                "Add Bill"
               )}
             </Button>
           </DialogFooter>
