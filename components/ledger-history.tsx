@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
-import { Plus, CheckCircle2 } from "lucide-react";
+import { Plus, CheckCircle2, Receipt } from "lucide-react";
 import { fetchLedger, addTransaction, settleDebt, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -73,6 +73,14 @@ export function LedgerHistory() {
   const [debtEntity, setDebtEntity] = useState("");
   const [debtType, setDebtType] = useState<"debt_given" | "debt_taken">("debt_given");
   const [debtSaving, setDebtSaving] = useState(false);
+
+  // Add Expense Dialog
+  const [expenseOpen, setExpenseOpen] = useState(false);
+  const [expenseItemName, setExpenseItemName] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseCategory, setExpenseCategory] = useState("");
+  const [expenseDate, setExpenseDate] = useState(() => new Date().toISOString().split("T")[0]!);
+  const [expenseSaving, setExpenseSaving] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -173,6 +181,49 @@ export function LedgerHistory() {
       }
     } finally {
       setDebtSaving(false);
+    }
+  };
+
+  const handleAddExpense = async () => {
+    const amount = Number.parseFloat(expenseAmount);
+    if (!expenseItemName.trim() || !Number.isFinite(amount) || amount <= 0 || !expenseCategory) {
+      toast({ title: "Enter valid item name, amount, and category", variant: "destructive" });
+      return;
+    }
+
+    setExpenseSaving(true);
+    try {
+      // Create a date string in ISO format from the date input
+      // Set time to end of day to ensure it's included in the selected date
+      const selectedDate = expenseDate 
+        ? new Date(expenseDate + "T23:59:59").toISOString()
+        : new Date().toISOString();
+      
+      const { success, error } = await addTransaction({
+        item_name: expenseItemName.trim(),
+        category: expenseCategory,
+        amount,
+        transaction_type: "expense",
+        created_at: selectedDate,
+      });
+
+      if (success) {
+        toast({ title: "Expense Logged" });
+        setExpenseOpen(false);
+        setExpenseItemName("");
+        setExpenseAmount("");
+        setExpenseCategory("");
+        setExpenseDate(new Date().toISOString().split("T")[0]!);
+        await loadData();
+      } else {
+        toast({
+          title: "Failed to log expense",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setExpenseSaving(false);
     }
   };
 
@@ -330,7 +381,7 @@ export function LedgerHistory() {
               : "text-muted-foreground hover:text-foreground"
             )}
           >
-            Expenses
+            Ledger
           </button>
           <button
             type="button"
@@ -359,6 +410,12 @@ export function LedgerHistory() {
         </div>
 
         {/* Add Buttons */}
+        {view === "expenses" && (
+          <Button onClick={() => setExpenseOpen(true)} size="lg" className="gap-2 w-full sm:w-auto">
+            <Receipt className="h-5 w-5" />
+            Log Manual Expense
+          </Button>
+        )}
         {view === "income" && (
           <Button onClick={() => setIncomeOpen(true)} size="lg" className="gap-2 w-full sm:w-auto">
             <Plus className="h-5 w-5" />
@@ -395,7 +452,7 @@ export function LedgerHistory() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Expense History</CardTitle>
+              <CardTitle>Transaction Ledger</CardTitle>
             </CardHeader>
             <CardContent className="p-0">
               <div className="block space-y-3 p-4 md:hidden">
@@ -667,6 +724,95 @@ export function LedgerHistory() {
                 </>
               ) : (
                 "Add Income"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Expense Dialog */}
+      <Dialog 
+        open={expenseOpen} 
+        onOpenChange={(open) => {
+          if (!open && !expenseSaving) {
+            setExpenseItemName("");
+            setExpenseAmount("");
+            setExpenseCategory("");
+            setExpenseDate(new Date().toISOString().split("T")[0]!);
+          }
+          setExpenseOpen(open);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Log Cash Expense</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="expense-item-name">Item Name</Label>
+              <Input
+                id="expense-item-name"
+                placeholder="e.g., Rickshaw Fare"
+                value={expenseItemName}
+                onChange={(e) => setExpenseItemName(e.target.value)}
+                disabled={expenseSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expense-amount">Amount (৳)</Label>
+              <Input
+                id="expense-amount"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="e.g., 50.00"
+                value={expenseAmount}
+                onChange={(e) => setExpenseAmount(e.target.value)}
+                disabled={expenseSaving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expense-category">Category</Label>
+              <Select value={expenseCategory} onValueChange={setExpenseCategory} disabled={expenseSaving}>
+                <SelectTrigger id="expense-category">
+                  <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Food">Food</SelectItem>
+                  <SelectItem value="Transport">Transport</SelectItem>
+                  <SelectItem value="Utilities">Utilities</SelectItem>
+                  <SelectItem value="Health">Health</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="expense-date">Date</Label>
+              <Input
+                id="expense-date"
+                type="date"
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+                disabled={expenseSaving}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setExpenseOpen(false)}
+              disabled={expenseSaving}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleAddExpense} disabled={expenseSaving}>
+              {expenseSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Logging...
+                </>
+              ) : (
+                "Log Expense"
               )}
             </Button>
           </DialogFooter>

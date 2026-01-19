@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarClock, History, Home, LogOut, Package, PieChart, Search, Settings, ShoppingCart, Wrench } from "lucide-react";
+import { CalendarClock, BookOpen, Home, LogOut, Package, PieChart, Search, Settings, ShoppingCart, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { ViewMode } from "@/lib/types";
 import { MobileNav } from "@/components/mobile-nav";
@@ -115,8 +115,8 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <History className="h-4 w-4" />
-                Expenses
+                <BookOpen className="h-4 w-4" />
+                Ledger
               </button>
               <button
                 type="button"

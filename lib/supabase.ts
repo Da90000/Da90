@@ -4,6 +4,9 @@ import { createClient as createBrowserClient } from '@/lib/supabase/client';
 
 // This is a client-side only export
 // For server-side operations, use @/lib/supabase/server
+// Create a singleton instance for backward compatibility
+let supabaseInstance: ReturnType<typeof createBrowserClient> | null = null;
+
 export const supabase = typeof window !== 'undefined' 
-  ? createBrowserClient()
+  ? (supabaseInstance || (supabaseInstance = createBrowserClient()))
   : null as any;

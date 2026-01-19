@@ -13,6 +13,7 @@ export function SettingsView() {
   const router = useRouter();
   const supabase = createClient();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
 
@@ -21,6 +22,7 @@ export function SettingsView() {
       try {
         const { data: { user } } = await supabase.auth.getUser();
         setUserEmail(user?.email || null);
+        setUserId(user?.id || null);
       } catch (error) {
         console.error("Failed to fetch user:", error);
       } finally {
@@ -102,11 +104,20 @@ export function SettingsView() {
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
-            <Skeleton className="h-6 w-64" />
+            <>
+              <Skeleton className="h-6 w-64 mb-4" />
+              <Skeleton className="h-5 w-96" />
+            </>
           ) : (
-            <div>
-              <p className="text-sm text-muted-foreground mb-2">Signed in as:</p>
-              <p className="text-base font-medium text-foreground">{userEmail || "Not available"}</p>
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Signed in as:</p>
+                <p className="text-base font-medium text-foreground">{userEmail || "Not available"}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">User ID:</p>
+                <p className="text-sm font-mono text-muted-foreground break-all">{userId || "Not available"}</p>
+              </div>
             </div>
           )}
           <Button

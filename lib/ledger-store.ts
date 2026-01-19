@@ -192,6 +192,7 @@ export async function addTransaction(transaction: {
   transaction_type: TransactionType;
   entity_name?: string;
   quantity?: number;
+  created_at?: string; // Optional custom date in ISO format
 }): Promise<{ success: boolean; error: unknown }> {
   if (!supabase) {
     return { success: false, error: new Error("Supabase client not initialized") };
@@ -205,7 +206,7 @@ export async function addTransaction(transaction: {
     transaction_type: transaction.transaction_type,
     entity_name: transaction.entity_name || null,
     is_settled: transaction.transaction_type.startsWith("debt_") ? false : null,
-    created_at: new Date().toISOString(),
+    created_at: transaction.created_at || new Date().toISOString(),
   });
 
   if (error) {
