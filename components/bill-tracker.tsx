@@ -25,6 +25,7 @@ import { toast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { FloatingActionBtn } from "@/components/ui/fab";
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,7 @@ import {
 function getBillIcon(name: string, category?: string) {
   const n = name.toLowerCase();
   const cat = category?.toLowerCase() || "";
-  
+
   // Smart icon matching based on name or category
   if (/net|wifi|internet|broadband/.test(n) || cat.includes("internet")) return Wifi;
   if (/gas|fuel/.test(n) || cat.includes("gas")) return Flame;
@@ -54,7 +55,7 @@ function getBillIcon(name: string, category?: string) {
   if (/rent|mortgage|housing|lease|house/.test(n) || cat.includes("rent")) return Home;
   if (/electric|water|utility|utilities/.test(n) || cat.includes("utility")) return Zap;
   if (/phone|mobile|cellular/.test(n)) return Smartphone;
-  
+
   return CreditCard;
 }
 
@@ -79,7 +80,7 @@ export function BillTracker() {
   const [payBill, setPayBill] = useState<BillWithDue | null>(null);
   const [payAmount, setPayAmount] = useState("");
   const [paySaving, setPaySaving] = useState(false);
-  
+
   // Add Bill Dialog State
   const [addOpen, setAddOpen] = useState(false);
   const [addName, setAddName] = useState("");
@@ -194,9 +195,9 @@ export function BillTracker() {
         } else if (error) {
           errorMsg = String(error);
         }
-        toast({ 
-          title: "Failed to add bill", 
-          description: errorMsg, 
+        toast({
+          title: "Failed to add bill",
+          description: errorMsg,
           variant: "destructive",
           duration: 10000, // Show longer for important errors
         });
@@ -250,11 +251,10 @@ export function BillTracker() {
             <Button
               onClick={() => setAddOpen(true)}
               size="sm"
-              className="shrink-0 gap-2"
+              className="hidden shrink-0 gap-2 md:flex"
             >
-              <Plus className="h-4 w-4 md:hidden" />
-              <span className="hidden md:inline">Add Subscription</span>
-              <Plus className="hidden h-4 w-4 md:inline" />
+              <Plus className="h-4 w-4" />
+              Add Subscription
             </Button>
           </div>
         </div>
@@ -473,6 +473,9 @@ export function BillTracker() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Action Button for Mobile */}
+      <FloatingActionBtn onClick={() => setAddOpen(true)} />
     </div>
   );
 }

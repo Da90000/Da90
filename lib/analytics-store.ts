@@ -17,6 +17,7 @@ export interface AnalyticsData {
   categoryData: CategoryData[];
   dailyData: DailyData[];
   totalSpent: number;
+  transactionCount: number;
 }
 
 // Color palette for categories (supports dark mode)
@@ -45,6 +46,7 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData> {
       categoryData: [],
       dailyData: [],
       totalSpent: 0,
+      transactionCount: 0,
     };
   }
 
@@ -69,6 +71,7 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData> {
       categoryData: [],
       dailyData: [],
       totalSpent: 0,
+      transactionCount: 0,
     };
   }
 
@@ -85,6 +88,7 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData> {
       categoryData: [],
       dailyData,
       totalSpent: 0,
+      transactionCount: 0,
     };
   }
 
@@ -136,5 +140,6 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData> {
     categoryData,
     dailyData,
     totalSpent,
+    transactionCount: data.length,
   };
 }

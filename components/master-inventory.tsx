@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { Search, Filter } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { FloatingActionBtn } from "@/components/ui/fab";
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ export function MasterInventory({
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [isAddOpen, setIsAddOpen] = useState(false);
 
   const cartItemIds = useMemo(
     () => new Set(shoppingList.map((item) => item.inventoryItemId)),
@@ -109,7 +111,11 @@ export function MasterInventory({
           <h1 className="text-2xl font-bold tracking-tight text-foreground">Master Inventory</h1>
           <p className="text-muted-foreground">Manage your product catalog</p>
         </div>
-        <AddItemDialog onAddItem={onAddItem} />
+        <AddItemDialog
+          onAddItem={onAddItem}
+          isOpen={isAddOpen}
+          setIsOpen={setIsAddOpen}
+        />
       </div>
 
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row">
@@ -207,6 +213,9 @@ export function MasterInventory({
           )}
         </p>
       </div>
+
+      {/* Floating Action Button for Mobile */}
+      <FloatingActionBtn onClick={() => setIsAddOpen(true)} />
     </div>
   );
 }

@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
-import { Plus, CheckCircle2, Receipt, CreditCard } from "lucide-react";
-import { fetchLedger, addTransaction, addDebtPayment, getTotalPaid, getRemainingAmount, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
+import { Plus, CheckCircle2, Receipt, CreditCard, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { fetchLedger, addTransaction, addDebtPayment, getTotalPaid, getRemainingAmount, deleteTransaction, updateTransaction, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
 import { toast } from "@/hooks/use-toast";
 import {
   Card,
@@ -38,10 +38,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useCurrency } from "@/contexts/currency-context";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
+import { FloatingActionBtn } from "@/components/ui/fab";
 
 function formatDate(iso: string): string {
   try {
@@ -60,7 +68,7 @@ export function LedgerHistory() {
   const [view, setView] = useState<ViewType>("expenses");
   const [allLedgerItems, setAllLedgerItems] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  
+
   // Add Income Dialog
   const [incomeOpen, setIncomeOpen] = useState(false);
   const [incomeAmount, setIncomeAmount] = useState("");
@@ -90,6 +98,16 @@ export function LedgerHistory() {
   const [paymentNote, setPaymentNote] = useState("");
   const [paymentSaving, setPaymentSaving] = useState(false);
 
+  // Edit Transaction Dialog
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<LedgerEntry | null>(null);
+  const [editItemName, setEditItemName] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editDate, setEditDate] = useState("");
+  const [editEntityName, setEditEntityName] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
   const loadData = async () => {
     setLoading(true);
     try {
@@ -117,13 +135,13 @@ export function LedgerHistory() {
   }, [allLedgerItems]);
 
   const debtList = useMemo(() => {
-    return allLedgerItems.filter(item => 
+    return allLedgerItems.filter(item =>
       (item.transaction_type === "debt_given" || item.transaction_type === "debt_taken") && !item.is_settled
     );
   }, [allLedgerItems]);
 
   const settledDebtList = useMemo(() => {
-    return allLedgerItems.filter(item => 
+    return allLedgerItems.filter(item =>
       (item.transaction_type === "debt_given" || item.transaction_type === "debt_taken") && item.is_settled === true
     );
   }, [allLedgerItems]);
@@ -209,10 +227,10 @@ export function LedgerHistory() {
     try {
       // Create a date string in ISO format from the date input
       // Set time to end of day to ensure it's included in the selected date
-      const selectedDate = expenseDate 
+      const selectedDate = expenseDate
         ? new Date(expenseDate + "T23:59:59").toISOString()
         : new Date().toISOString();
-      
+
       const { success, error } = await addTransaction({
         item_name: expenseItemName.trim(),
         category: expenseCategory,
@@ -289,6 +307,109 @@ export function LedgerHistory() {
     }
   };
 
+  const handleEditClick = (transaction: LedgerEntry) => {
+    setEditingTransaction(transaction);
+    setEditItemName(transaction.itemName);
+    setEditAmount(String(transaction.amount));
+    setEditCategory(transaction.category);
+    setEditEntityName(transaction.entity_name || "");
+    // Convert ISO date to YYYY-MM-DD format for input
+    try {
+      const dateObj = new Date(transaction.date);
+      setEditDate(dateObj.toISOString().split("T")[0] || "");
+    } catch {
+      setEditDate("");
+    }
+    setEditOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingTransaction) return;
+
+    const amount = Number.parseFloat(editAmount);
+    if (!editItemName.trim() || !Number.isFinite(amount) || amount <= 0 || !editCategory) {
+      toast({ title: "Enter valid values", variant: "destructive" });
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const updates: any = {
+        item_name: editItemName.trim(),
+        category: editCategory,
+        amount: amount,
+      };
+
+      if (editDate) {
+        updates.created_at = new Date(editDate + "T23:59:59").toISOString();
+      }
+
+      if (editEntityName.trim()) {
+        updates.entity_name = editEntityName.trim();
+      }
+
+      const { success, error } = await updateTransaction(editingTransaction.id, updates);
+
+      if (success) {
+        toast({ title: "Transaction updated successfully" });
+        setEditOpen(false);
+        setEditingTransaction(null);
+        await loadData();
+      } else {
+        toast({
+          title: "Failed to update transaction",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteClick = async (transaction: LedgerEntry) => {
+    const isDebt = transaction.transaction_type?.startsWith("debt_");
+    const confirmMessage = isDebt
+      ? `Delete this debt entry? This will also remove all associated payment records.`
+      : `Delete this transaction?`;
+
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const { success, error } = await deleteTransaction(transaction.id);
+
+      if (success) {
+        toast({ title: "Transaction deleted successfully" });
+        await loadData();
+      } else {
+        toast({
+          title: "Failed to delete transaction",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error deleting transaction",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Helper function to handle FAB click based on current view
+  const handleFabClick = () => {
+    if (view === "expenses") {
+      setExpenseOpen(true);
+    } else if (view === "income") {
+      setIncomeOpen(true);
+    } else if (view === "debt") {
+      setDebtOpen(true);
+    }
+  };
+
   const totalExpenses = expensesList.reduce((sum, r) => sum + r.amount, 0);
   const totalIncome = incomeList.reduce((sum, r) => sum + r.amount, 0);
   const totalDebt = debtList.reduce((sum, r) => {
@@ -303,6 +424,29 @@ export function LedgerHistory() {
       <TableCell className="font-medium">{r.itemName || "—"}</TableCell>
       <TableCell>{r.category}</TableCell>
       <TableCell className="text-right tabular-nums">{formatPrice(r.amount)}</TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleEditClick(r)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleDeleteClick(r)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </TableCell>
     </>
   );
 
@@ -313,6 +457,29 @@ export function LedgerHistory() {
       <TableCell>{r.category}</TableCell>
       <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-400">
         +{formatPrice(r.amount)}
+      </TableCell>
+      <TableCell className="text-right">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="sm">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => handleEditClick(r)}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => handleDeleteClick(r)}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </>
   );
@@ -352,17 +519,40 @@ export function LedgerHistory() {
           {isGiven ? "-" : "+"}{formatPrice(r.amount)}
         </TableCell>
         <TableCell className="text-right">
-          {!isSettled && (
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => handleOpenPaymentDialog(r.id, remaining)}
-              className="gap-1"
-            >
-              <CreditCard className="h-4 w-4" />
-              Record Payment
-            </Button>
-          )}
+          <div className="flex items-center justify-end gap-2">
+            {!isSettled && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => handleOpenPaymentDialog(r.id, remaining)}
+                className="gap-1"
+              >
+                <CreditCard className="h-4 w-4" />
+                Record Payment
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleEditClick(r)}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => handleDeleteClick(r)}
+                  className="text-destructive focus:text-destructive"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </TableCell>
       </>
     );
@@ -376,7 +566,7 @@ export function LedgerHistory() {
     const totalPaid = isDebt ? getTotalPaid(r) : 0;
     const remaining = isDebt ? getRemainingAmount(r) : 0;
     const progressPercent = isDebt && r.amount > 0 ? (totalPaid / r.amount) * 100 : 0;
-    
+
     return (
       <div
         key={r.id}
@@ -443,6 +633,32 @@ export function LedgerHistory() {
             )}
           </div>
         </div>
+
+        {/* Edit/Delete Menu */}
+        <div className="mt-3 flex justify-end border-t border-border/50 pt-3">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 gap-2">
+                <MoreVertical className="h-4 w-4" />
+                Actions
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleEditClick(r)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => handleDeleteClick(r)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     );
   };
@@ -458,8 +674,8 @@ export function LedgerHistory() {
             className={cn(
               "px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "expenses"
-              ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
             )}
           >
             Ledger
@@ -492,19 +708,19 @@ export function LedgerHistory() {
 
         {/* Add Buttons */}
         {view === "expenses" && (
-          <Button onClick={() => setExpenseOpen(true)} size="lg" className="gap-2 w-full sm:w-auto">
+          <Button onClick={() => setExpenseOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto">
             <Receipt className="h-5 w-5" />
             Log Manual Expense
           </Button>
         )}
         {view === "income" && (
-          <Button onClick={() => setIncomeOpen(true)} size="lg" className="gap-2 w-full sm:w-auto">
+          <Button onClick={() => setIncomeOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto">
             <Plus className="h-5 w-5" />
             Add Income
           </Button>
         )}
         {view === "debt" && (
-          <Button onClick={() => setDebtOpen(true)} size="lg" className="gap-2 w-full sm:w-auto">
+          <Button onClick={() => setDebtOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto">
             <Plus className="h-5 w-5" />
             Add Debt
           </Button>
@@ -560,6 +776,7 @@ export function LedgerHistory() {
                       <TableHead>Item Name</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -640,6 +857,7 @@ export function LedgerHistory() {
                       <TableHead>Source</TableHead>
                       <TableHead>Category</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -851,8 +1069,8 @@ export function LedgerHistory() {
       </Dialog>
 
       {/* Add Expense Dialog */}
-      <Dialog 
-        open={expenseOpen} 
+      <Dialog
+        open={expenseOpen}
         onOpenChange={(open) => {
           if (!open && !expenseSaving) {
             setExpenseItemName("");
@@ -960,8 +1178,8 @@ export function LedgerHistory() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="debt-entity">
-              {debtType === "debt_given" ? "Who did you lend to?" : "Who did you borrow from?"}
-            </Label>
+                {debtType === "debt_given" ? "Who did you lend to?" : "Who did you borrow from?"}
+              </Label>
               <Input
                 id="debt-entity"
                 placeholder={debtType === "debt_given" ? "e.g., John, Friend" : "e.g., Bank, Family"}
@@ -1080,6 +1298,161 @@ export function LedgerHistory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Transaction Dialog */}
+      <Dialog
+        open={editOpen}
+        onOpenChange={(open) => {
+          if (!open && !editSaving) {
+            setEditingTransaction(null);
+            setEditItemName("");
+            setEditAmount("");
+            setEditCategory("");
+            setEditDate("");
+            setEditEntityName("");
+          }
+          setEditOpen(open);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Transaction</DialogTitle>
+          </DialogHeader>
+          {editingTransaction && (
+            <div className="space-y-4">
+              {editingTransaction.transaction_type?.startsWith("debt_") && (
+                <div className="rounded-md bg-amber-500/10 border border-amber-500/20 p-3">
+                  <p className="text-sm text-amber-700 dark:text-amber-400">
+                    ⚠️ Warning: Changing the amount won't affect payments already recorded.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">
+                  {editingTransaction.transaction_type?.startsWith("debt_") ? "Description" : "Item Name"}
+                </Label>
+                <Input
+                  id="edit-name"
+                  placeholder="Enter name"
+                  value={editItemName}
+                  onChange={(e) => setEditItemName(e.target.value)}
+                  disabled={editSaving}
+                />
+              </div>
+
+              {editingTransaction.transaction_type?.startsWith("debt_") && (
+                <div className="space-y-2">
+                  <Label htmlFor="edit-entity">Entity Name</Label>
+                  <Input
+                    id="edit-entity"
+                    placeholder="Who gave/took the money"
+                    value={editEntityName}
+                    onChange={(e) => setEditEntityName(e.target.value)}
+                    disabled={editSaving}
+                  />
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-amount">Amount ({currencySymbol})</Label>
+                <Input
+                  id="edit-amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="Enter amount"
+                  value={editAmount}
+                  onChange={(e) => setEditAmount(e.target.value)}
+                  disabled={editSaving}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-category">Category</Label>
+                <Select value={editCategory} onValueChange={setEditCategory} disabled={editSaving}>
+                  <SelectTrigger id="edit-category">
+                    <SelectValue placeholder="Select a category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {editingTransaction.transaction_type === "income" ? (
+                      <>
+                        <SelectItem value="Income">Income</SelectItem>
+                        <SelectItem value="Salary">Salary</SelectItem>
+                        <SelectItem value="Bonus">Bonus</SelectItem>
+                        <SelectItem value="Gift">Gift</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    ) : editingTransaction.transaction_type?.startsWith("debt_") ? (
+                      <SelectItem value="Debt">Debt</SelectItem>
+                    ) : (
+                      <>
+                        <SelectItem value="Food">Food</SelectItem>
+                        <SelectItem value="Transport">Transport</SelectItem>
+                        <SelectItem value="Utilities">Utilities</SelectItem>
+                        <SelectItem value="Health">Health</SelectItem>
+                        <SelectItem value="Entertainment">Entertainment</SelectItem>
+                        <SelectItem value="Shopping">Shopping</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="edit-date">Date</Label>
+                <Input
+                  id="edit-date"
+                  type="date"
+                  value={editDate}
+                  onChange={(e) => setEditDate(e.target.value)}
+                  disabled={editSaving}
+                />
+              </div>
+            </div>
+          )}
+          <DialogFooter className="flex-col gap-2 sm:flex-row">
+            <Button
+              variant="outline"
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive w-full sm:w-auto sm:mr-auto"
+              onClick={() => {
+                setEditOpen(false);
+                if (editingTransaction) {
+                  handleDeleteClick(editingTransaction);
+                }
+              }}
+              disabled={editSaving}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete Entry
+            </Button>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+                disabled={editSaving}
+                className="flex-1 sm:flex-none"
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleSaveEdit} disabled={editSaving} className="flex-1 sm:flex-none">
+                {editSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Changes"
+                )}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Floating Action Button for Mobile */}
+      <FloatingActionBtn onClick={handleFabClick} />
     </div>
   );
 }

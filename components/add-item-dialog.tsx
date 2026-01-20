@@ -18,13 +18,19 @@ import { CATEGORIES } from "@/lib/types";
 
 interface AddItemDialogProps {
   onAddItem: (item: { name: string; category: string; basePrice: number }) => void;
+  isOpen?: boolean;
+  setIsOpen?: (open: boolean) => void;
 }
 
-export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function AddItemDialog({ onAddItem, isOpen: controlledIsOpen, setIsOpen: controlledSetIsOpen }: AddItemDialogProps) {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+
+  // Use controlled state if provided, otherwise use internal state
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
+  const setIsOpen = controlledSetIsOpen || setInternalIsOpen;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,7 +50,7 @@ export function AddItemDialog({ onAddItem }: AddItemDialogProps) {
 
   if (!isOpen) {
     return (
-      <Button onClick={() => setIsOpen(true)} className="gap-2">
+      <Button onClick={() => setIsOpen(true)} className="hidden gap-2 md:flex">
         <Plus className="h-4 w-4" />
         Add Item
       </Button>

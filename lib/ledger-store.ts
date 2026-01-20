@@ -40,13 +40,13 @@ export function getLedger(): LedgerEntry[] {
  */
 function updateLocalInventoryPrices(items: ShoppingListItem[]): void {
   if (typeof window === "undefined") return;
-  
+
   const stored = localStorage.getItem(INVENTORY_KEY);
   if (!stored) return;
-  
+
   const inventory: InventoryItem[] = JSON.parse(stored);
   let updated = false;
-  
+
   for (const item of items) {
     const price = item.manualPrice ?? item.basePrice;
     // Safety check: only update if price > 0
@@ -59,7 +59,7 @@ function updateLocalInventoryPrices(items: ShoppingListItem[]): void {
       }
     }
   }
-  
+
   if (updated) {
     localStorage.setItem(INVENTORY_KEY, JSON.stringify(inventory));
     console.log(`✅ Updated ${items.length} inventory lastPaidPrice in local storage`);
@@ -68,7 +68,7 @@ function updateLocalInventoryPrices(items: ShoppingListItem[]): void {
 
 export function addToLedger(items: ShoppingListItem[]): void {
   const currentLedger = getLedger();
-  
+
   const newEntries: LedgerEntry[] = items.map(item => {
     const price = item.manualPrice ?? item.basePrice;
     return {
@@ -83,10 +83,10 @@ export function addToLedger(items: ShoppingListItem[]): void {
 
   localStorage.setItem(LEDGER_KEY, JSON.stringify([...currentLedger, ...newEntries]));
   console.log(`✅ Logged ${newEntries.length} items to Ledger`);
-  
+
   // Update local inventory prices
   updateLocalInventoryPrices(items);
-  
+
   // Sync to Supabase in the background
   saveToLedger(items).then(({ success, error }) => {
     if (!success) console.error("Failed to sync ledger to Supabase:", error);
@@ -110,7 +110,7 @@ async function updateInventoryPricesInSupabase(
 
   // Group updates by inventory item ID to handle duplicates
   const priceUpdates = new Map<string, number>();
-  
+
   for (const item of items) {
     const price = item.manualPrice ?? item.basePrice;
     // Safety check: only update if price > 0
@@ -130,11 +130,11 @@ async function updateInventoryPricesInSupabase(
 
   const results = await Promise.all(updatePromises);
   const errors = results.filter((result) => result.error);
-  
+
   if (errors.length > 0) {
     return { success: false, error: errors[0].error };
   }
-  
+
   console.log(`✅ Updated ${priceUpdates.size} inventory last_paid_price in Supabase`);
   return { success: true, error: null };
 }
@@ -435,4 +435,132 @@ export function getTotalPaid(entry: LedgerEntry): number {
 export function getRemainingAmount(entry: LedgerEntry): number {
   const totalPaid = getTotalPaid(entry);
   return Math.max(0, entry.amount - totalPaid);
+}
+
+/**
+ * Deletes a transaction from the ledger.
+ * If it's a debt, Supabase ON DELETE CASCADE will handle associated debt_payments.
+ * @param id - The ledger entry ID to delete
+ * @returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function deleteTransaction(id: string): Promise<{ success: boolean; error: unknown }> {
+  if (!supabase) {
+    return { success: false, error: new Error("Supabase client not initialized") };
+  }
+
+  if (!id) {
+    return { success: false, error: new Error("Transaction ID is required") };
+  }
+
+  try {
+    // First check if the entry exists
+    const { data: existing, error: fetchError } = await supabase
+      .from("ledger")
+      .select("id, transaction_type")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) {
+      return { success: false, error: fetchError };
+    }
+
+    if (!existing) {
+      return { success: false, error: new Error("Transaction not found") };
+    }
+
+    // Delete the transaction (CASCADE will handle debt_payments if it's a debt)
+    const { error: deleteError } = await supabase
+      .from("ledger")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      return { success: false, error: deleteError };
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error };
+  }
+}
+
+/**
+ * Updates a transaction in the ledger.
+ * Allows updating item_name, category, amount, and created_at (date).
+ * NOTE: For debts, changing the amount won't affect payments already recorded.
+ * @param id - The ledger entry ID to update
+ * @param updates - Partial updates to apply
+ * @returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function updateTransaction(
+  id: string,
+  updates: {
+    item_name?: string;
+    category?: string;
+    amount?: number;
+    created_at?: string;
+    entity_name?: string;
+  }
+): Promise<{ success: boolean; error: unknown }> {
+  if (!supabase) {
+    return { success: false, error: new Error("Supabase client not initialized") };
+  }
+
+  if (!id) {
+    return { success: false, error: new Error("Transaction ID is required") };
+  }
+
+  if (!updates || Object.keys(updates).length === 0) {
+    return { success: false, error: new Error("No updates provided") };
+  }
+
+  try {
+    // First check if the entry exists
+    const { data: existing, error: fetchError } = await supabase
+      .from("ledger")
+      .select("id, transaction_type")
+      .eq("id", id)
+      .single();
+
+    if (fetchError) {
+      return { success: false, error: fetchError };
+    }
+
+    if (!existing) {
+      return { success: false, error: new Error("Transaction not found") };
+    }
+
+    // Build the update object with only provided fields
+    const updateData: any = {};
+
+    if (updates.item_name !== undefined) {
+      updateData.item_name = updates.item_name;
+    }
+    if (updates.category !== undefined) {
+      updateData.category = updates.category;
+    }
+    if (updates.amount !== undefined) {
+      updateData.amount = updates.amount;
+    }
+    if (updates.created_at !== undefined) {
+      updateData.created_at = updates.created_at;
+    }
+    if (updates.entity_name !== undefined) {
+      updateData.entity_name = updates.entity_name;
+    }
+
+    // Perform the update
+    const { error: updateError } = await supabase
+      .from("ledger")
+      .update(updateData)
+      .eq("id", id);
+
+    if (updateError) {
+      return { success: false, error: updateError };
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    return { success: false, error };
+  }
 }
