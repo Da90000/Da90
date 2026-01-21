@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Download, Loader2 } from "lucide-react";
+import { LogOut, Download, Loader2, Monitor, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ export function SettingsView() {
   const router = useRouter();
   const supabase = createClient();
   const { currencySymbol, currencyCode, updateCurrency: updateCurrencySettings } = useCurrency();
+  const { setTheme, theme } = useTheme();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -167,6 +169,42 @@ export function SettingsView() {
             <LogOut className="mr-2 h-4 w-4" />
             Sign Out
           </Button>
+        </CardContent>
+      </Card>
+
+      {/* Appearance Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Appearance</CardTitle>
+          <CardDescription>Customize the look and feel of the application</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              variant="outline"
+              className={`justify-start gap-2 ${theme === "light" ? "ring-2 ring-primary" : ""}`}
+              onClick={() => setTheme("light")}
+            >
+              <Sun className="h-4 w-4" />
+              <span className="hidden sm:inline">Light</span>
+            </Button>
+            <Button
+              variant="outline"
+              className={`justify-start gap-2 ${theme === "dark" ? "ring-2 ring-primary" : ""}`}
+              onClick={() => setTheme("dark")}
+            >
+              <Moon className="h-4 w-4" />
+              <span className="hidden sm:inline">Dark</span>
+            </Button>
+            <Button
+              variant="outline"
+              className={`justify-start gap-2 ${theme === "system" ? "ring-2 ring-primary" : ""}`}
+              onClick={() => setTheme("system")}
+            >
+              <Monitor className="h-4 w-4" />
+              <span className="hidden sm:inline">System</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

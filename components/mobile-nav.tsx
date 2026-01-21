@@ -63,52 +63,50 @@ export function MobileNav({
         onOpenChange={setSearchOpen}
         onNavigate={onViewChange}
       />
-      
+
       {/* Bottom Navigation Bar - Primary Items + Menu */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background/95 backdrop-blur pb-[env(safe-area-inset-bottom)] supports-[backdrop-filter]:bg-background/80"
+        className="fixed bottom-6 left-6 right-6 z-50 flex md:hidden items-center justify-around rounded-full bg-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.2)] py-2 border border-slate-100"
         role="navigation"
         aria-label="Main"
       >
         {/* Primary tabs */}
-        {PRIMARY_TABS.map(({ view, icon: Icon, label }) => (
-          <button
-            key={view}
-            type="button"
-            onClick={() => onViewChange(view)}
-            className={`flex flex-1 min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 px-2 py-2 text-xs font-medium transition-all active:scale-95 ${
-              currentView === view
-                ? "text-primary"
-                : "text-muted-foreground"
-            }`}
-            aria-current={currentView === view ? "page" : undefined}
-            aria-label={label}
-          >
-            <span className="relative inline-flex">
-              <Icon className="h-5 w-5" aria-hidden />
-              {view === "market" && shoppingListCount > 0 && (
-                <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                  {shoppingListCount > 99 ? "99+" : shoppingListCount}
-                </span>
-              )}
-            </span>
-            <span>{label}</span>
-          </button>
-        ))}
+        {PRIMARY_TABS.map(({ view, icon: Icon, label }) => {
+          const isActive = currentView === view;
+          return (
+            <button
+              key={view}
+              type="button"
+              onClick={() => onViewChange(view)}
+              className="relative flex flex-1 flex-col items-center justify-center gap-1 transition-all active:scale-95"
+              aria-current={isActive ? "page" : undefined}
+              aria-label={label}
+            >
+              <div className={`relative p-2.5 rounded-full transition-all duration-300 ${isActive ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"}`}>
+                <Icon className="h-6 w-6" aria-hidden />
+                {view === "market" && shoppingListCount > 0 && (
+                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 border-2 border-white px-1 text-[10px] font-bold text-white shadow-sm">
+                    {shoppingListCount > 99 ? "99+" : shoppingListCount}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
 
-        {/* Menu button - Opens the "More" sheet */}
+        {/* Menu button */}
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
-          className={`flex flex-1 min-h-[44px] min-w-[44px] flex-col items-center justify-center gap-0.5 px-2 py-2 text-xs font-medium transition-all active:scale-95 ${
-            moreOpen || SECONDARY_TABS.some(tab => tab.view === currentView)
-              ? "text-primary"
-              : "text-muted-foreground"
-          }`}
+          className="relative flex flex-1 flex-col items-center justify-center gap-1 transition-all active:scale-95"
           aria-label="More options"
         >
-          <Grid3x3 className="h-5 w-5" aria-hidden />
-          <span>Menu</span>
+          <div className={`relative p-2.5 rounded-full transition-all duration-300 ${moreOpen || SECONDARY_TABS.some(tab => tab.view === currentView)
+              ? "bg-blue-50 text-blue-600"
+              : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+            }`}>
+            <Grid3x3 className="h-6 w-6" aria-hidden />
+          </div>
         </button>
       </nav>
 
@@ -118,7 +116,7 @@ export function MobileNav({
           <SheetHeader>
             <SheetTitle>More Options</SheetTitle>
           </SheetHeader>
-          
+
           <div className="grid grid-cols-4 gap-4 py-6">
             {SECONDARY_TABS.map(({ view, icon: Icon, label }) => {
               const isActive = currentView === view;
@@ -127,11 +125,10 @@ export function MobileNav({
                   key={view}
                   type="button"
                   onClick={() => handleSecondaryItemClick(view)}
-                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-lg transition-all active:scale-95 ${
-                    isActive
-                      ? "bg-primary text-primary-foreground"
-                      : "bg-secondary text-foreground hover:bg-secondary/80"
-                  }`}
+                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-lg transition-all active:scale-95 ${isActive
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-foreground hover:bg-secondary/80"
+                    }`}
                   aria-current={isActive ? "page" : undefined}
                   aria-label={label}
                 >
