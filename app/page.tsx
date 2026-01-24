@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { AnalyticsView } from "@/components/analytics-view";
+
 import { BillTracker } from "@/components/bill-tracker";
 import { BottomNav } from "@/components/bottom-nav";
 import { DashboardView } from "@/components/dashboard-view";
@@ -213,13 +213,17 @@ export default function ShopListApp() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Header
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        shoppingListCount={shoppingList.length}
-      />
+      {/* Hide old header on dashboard - new dashboard has its own */}
+      {currentView !== "dashboard" && (
+        <Header
+          currentView={currentView}
+          onViewChange={setCurrentView}
+          shoppingListCount={shoppingList.length}
+        />
+      )}
 
-      <main className="mx-auto max-w-7xl px-4 pt-4 pb-24 sm:px-6 md:pb-8 lg:px-8">
+      {/* Adjust padding for dashboard view */}
+      <main className={currentView === "dashboard" ? "" : "mx-auto max-w-7xl px-4 pt-4 pb-24 sm:px-6 md:pb-8 lg:px-8"}>
         {currentView === "dashboard" && (
           <DashboardView onNavigate={handleNavigate} />
         )}
@@ -245,7 +249,7 @@ export default function ShopListApp() {
           />
         )}
         {currentView === "expenses" && <LedgerHistory />}
-        {currentView === "analytics" && <AnalyticsView />}
+
         {currentView === "maintenance" && <MaintenanceTracker />}
         {currentView === "bills" && <BillTracker />}
         {currentView === "settings" && <SettingsView />}

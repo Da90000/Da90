@@ -1,158 +1,299 @@
+import { create } from "zustand";
 import { supabase } from "@/lib/supabase";
-import { getDaysOverdue } from "@/lib/maintenance-store";
+import { format, subDays, startOfMonth, endOfMonth, startOfYear, endOfYear, isSameMonth, isSameYear, parseISO, subMonths, getDaysInMonth } from "date-fns";
+
+// --- Types ---
+
+export type Period = "week" | "month" | "year";
 
 export interface LedgerEntry {
   id: string;
-  date: string;
-  itemName: string;
-  category: string;
-  amount: number;
-  quantity: number;
-}
-
-function toLedgerEntry(row: Record<string, unknown>): LedgerEntry {
-  return {
-    id: String(row.id ?? ""),
-    date: String(row.created_at ?? ""),
-    itemName: String(row.item_name ?? ""),
-    category: String(row.category ?? ""),
-    amount: Number(row.amount) || 0,
-    quantity: Number(row.quantity) || 1,
-    transaction_type: row.transaction_type as "expense" | "income" | "debt_given" | "debt_taken" | undefined,
-    entity_name: row.entity_name ? String(row.entity_name) : undefined,
-    is_settled: row.is_settled === true,
-  };
-}
-
-/** Start of current month (00:00) and end (23:59:59.999) as ISO strings. */
-function getCurrentMonthRange(): { start: string; end: string } {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
-  return { start: start.toISOString(), end: end.toISOString() };
-}
-
-/**
- * Fetches dashboard stats via parallel queries:
- * 1. Finance: ledger for current month, calculate income, expenses, net balance
- * 2. Debt: active (unsettled) debts
- * 3. Maintenance: maintenance_items, count where getDaysOverdue > 0
- * 4. Recent Activity: 5 most recent ledger entries
- */
-export async function fetchDashboardStats(): Promise<{
-  totalIncome: number;
-  totalExpenses: number;
-  netBalance: number;
-  activeDebt: number;
-  overdueCount: number;
-  recentTx: LedgerEntry[];
-}> {
-  const empty = { totalIncome: 0, totalExpenses: 0, netBalance: 0, activeDebt: 0, overdueCount: 0, recentTx: [] };
-
-  if (!supabase) {
-    console.warn("Supabase client not initialized. Skipping fetch.");
-    return empty;
-  }
-
-  const { start, end } = getCurrentMonthRange();
-
-  const [ledgerRes, debtRes, maintenanceRes, recentRes] = await Promise.all([
-    supabase
-      .from("ledger")
-      .select("amount, transaction_type")
-      .gte("created_at", start)
-      .lte("created_at", end),
-    supabase
-      .from("ledger")
-      .select("amount, transaction_type")
-      .in("transaction_type", ["debt_given", "debt_taken"])
-      .or("is_settled.is.null,is_settled.eq.false"),
-    supabase
-      .from("maintenance_items")
-      .select("id, last_service_date, service_interval_days"),
-    supabase
-      .from("ledger")
-      .select("id, created_at, item_name, category, amount, quantity, transaction_type")
-      .order("created_at", { ascending: false })
-      .limit(5),
-  ]);
-
-  // Calculate income and expenses
-  let totalIncome = 0;
-  let totalExpenses = 0;
-  if (!ledgerRes.error && ledgerRes.data) {
-    const rows = ledgerRes.data as { amount?: number; transaction_type?: string }[];
-    for (const row of rows) {
-      const amount = Number(row.amount) || 0;
-      const type = row.transaction_type || "expense";
-      if (type === "income") {
-        totalIncome += amount;
-      } else if (type === "expense") {
-        totalExpenses += amount;
-      }
-    }
-  } else if (ledgerRes.error) {
-    console.error("Dashboard ledger fetch error:", ledgerRes.error);
-  }
-
-  const netBalance = totalIncome - totalExpenses;
-
-  // Calculate active debt
-  let activeDebt = 0;
-  if (!debtRes.error && debtRes.data) {
-    const rows = debtRes.data as { amount?: number; transaction_type?: string }[];
-    for (const row of rows) {
-      const amount = Number(row.amount) || 0;
-      const type = row.transaction_type || "";
-      if (type === "debt_given") {
-        activeDebt += amount; // Money given out (positive)
-      } else if (type === "debt_taken") {
-        activeDebt -= amount; // Money borrowed (negative)
-      }
-    }
-  } else if (debtRes.error) {
-    console.error("Dashboard debt fetch error:", debtRes.error);
-  }
-
-  let overdueCount = 0;
-  if (!maintenanceRes.error && maintenanceRes.data) {
-    const rows = maintenanceRes.data as { last_service_date: string; service_interval_days: number }[];
-    overdueCount = rows.filter(
-      (r) => getDaysOverdue(r.last_service_date, r.service_interval_days) > 0
-    ).length;
-  } else if (maintenanceRes.error) {
-    console.error("Dashboard maintenance_items fetch error:", maintenanceRes.error);
-  }
-
-  const recentTx: LedgerEntry[] = [];
-  if (!recentRes.error && recentRes.data) {
-    recentTx.push(...(recentRes.data as Record<string, unknown>[]).map(toLedgerEntry));
-  } else if (recentRes.error) {
-    console.error("Dashboard recent ledger fetch error:", recentRes.error);
-  }
-
-  return { totalIncome, totalExpenses, netBalance, activeDebt, overdueCount, recentTx };
-}
-
-/**
- * Log a quick manual cash expense to the ledger.
- */
-export async function logQuickExpense(entry: {
+  created_at: string;
   item_name: string;
   category: string;
   amount: number;
-}): Promise<boolean> {
-  if (!supabase) return false;
-  const { error } = await supabase.from("ledger").insert({
-    item_name: entry.item_name,
-    category: entry.category,
-    quantity: 1,
-    amount: entry.amount,
-    created_at: new Date().toISOString(),
-  });
-  if (error) {
-    console.error("logQuickExpense error:", error);
-    return false;
+  transaction_type: "income" | "expense" | "debt_given" | "debt_taken";
+}
+
+export interface DashboardStats {
+  balance: number;
+  monthlyIncome: number;
+  monthlyExpense: number;
+  savingsRate: number;
+  totalTransactions: number;
+  averageDaily: number;
+  averageDailyChange: number;
+}
+
+export interface ChartDataPoint {
+  label: string;
+  amount: number;
+  date: string; // Helper for sorting/filtering
+}
+
+export interface CategoryData {
+  category: string;
+  amount: number;
+  percentage: number;
+  transactions: number;
+  fill: string;
+}
+
+interface DashboardState {
+  period: Period;
+  stats: DashboardStats;
+  chartData: ChartDataPoint[];
+  categoryData: CategoryData[];
+  recentTransactions: LedgerEntry[];
+
+  // Cache for raw data
+  rawLedger: LedgerEntry[];
+
+  isLoading: boolean;
+  error: string | null;
+
+  setPeriod: (period: Period) => void;
+  fetchDashboardData: () => Promise<void>;
+}
+
+// --- Helpers ---
+
+const CATEGORY_COLORS = [
+  "#10b981", // emerald
+  "#3b82f6", // blue
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#06b6d4", // cyan
+  "#f97316", // orange
+  "#ec4899", // pink
+];
+
+// --- Store ---
+
+export const useDashboardStore = create<DashboardState>((set, get) => ({
+  period: "month",
+  stats: { balance: 0, monthlyIncome: 0, monthlyExpense: 0, savingsRate: 0, totalTransactions: 0, averageDaily: 0, averageDailyChange: 0 },
+  chartData: [],
+  categoryData: [],
+  recentTransactions: [],
+  rawLedger: [],
+  isLoading: false,
+  error: null,
+
+  setPeriod: (period: Period) => {
+    set({ period });
+    // Re-process chart data immediately using cached rawLedger
+    const { rawLedger } = get();
+    if (rawLedger.length > 0) {
+      const chartData = processChartData(rawLedger, period);
+      set({ chartData });
+    } else {
+      // If no data yet, fetch it
+      get().fetchDashboardData();
+    }
+  },
+
+  fetchDashboardData: async () => {
+    set({ isLoading: true, error: null });
+    try {
+      if (!supabase) throw new Error("Supabase client not initialized");
+
+      // 1. Fetch ALL Ledger Entries (Income & Expense)
+      // optimizing selection to just needed fields
+      const { data, error } = await supabase
+        .from("ledger")
+        .select("id, created_at, item_name, category, amount, transaction_type")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      const ledger = (data as any[])?.map(row => ({
+        ...row,
+        amount: Number(row.amount) || 0,
+        transaction_type: row.transaction_type || "expense",
+      })) || [];
+
+      // 2. Calculate Stats
+      const now = new Date();
+      let totalIncome = 0;
+      let totalExpense = 0;
+      let monthlyIncome = 0;
+      let monthlyExpense = 0;
+      let monthlyTransactions = 0;
+      let lastMonthExpense = 0;
+      const lastMonthDate = subMonths(now, 1);
+
+      ledger.forEach(item => {
+        const type = item.transaction_type;
+        const amount = item.amount;
+        const date = new Date(item.created_at);
+
+        if (type === "income") totalIncome += amount;
+        if (type === "expense") totalExpense += amount;
+
+        // Monthly stats check (Current Month)
+        if (isSameMonth(date, now) && isSameYear(date, now)) {
+          if (type === "income" || type === "expense") {
+            monthlyTransactions++;
+          }
+          if (type === "income") monthlyIncome += amount;
+          if (type === "expense") monthlyExpense += amount;
+        }
+
+        // Last Month stats check
+        if (isSameMonth(date, lastMonthDate) && isSameYear(date, lastMonthDate)) {
+          if (type === "expense") lastMonthExpense += amount;
+        }
+      });
+
+      const balance = totalIncome - totalExpense;
+      const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100 : 0;
+
+      // Average Daily Calculation
+      const currentDay = now.getDate();
+      const safeDivisor = currentDay === 0 ? 1 : currentDay; // Should be 1-31 anyway
+      const averageDaily = monthlyExpense / safeDivisor;
+
+      const daysInLastMonth = getDaysInMonth(lastMonthDate);
+      const lastMonthDailyAvg = lastMonthExpense / daysInLastMonth;
+
+      const averageDailyChange = lastMonthDailyAvg > 0
+        ? Math.round(((averageDaily - lastMonthDailyAvg) / lastMonthDailyAvg) * 100)
+        : 0;
+
+      // 3. Process Chart Data
+      const chartData = processChartData(ledger, get().period);
+
+      // 4. Process Category Data (Current Month Expenses)
+      const currentMonthExpenses = ledger.filter(item =>
+        item.transaction_type === "expense" &&
+        isSameMonth(new Date(item.created_at), now) &&
+        isSameYear(new Date(item.created_at), now)
+      );
+
+      const catMap = new Map<string, { amount: number; count: number }>();
+      currentMonthExpenses.forEach(item => {
+        const cat = item.category || "Other";
+        const curr = catMap.get(cat) || { amount: 0, count: 0 };
+        catMap.set(cat, { amount: curr.amount + item.amount, count: curr.count + 1 });
+      });
+
+      const processedCategories: CategoryData[] = Array.from(catMap.entries())
+        .map(([category, data], idx) => ({
+          category,
+          amount: data.amount,
+          transactions: data.count,
+          percentage: monthlyExpense > 0 ? (data.amount / monthlyExpense) * 100 : 0,
+          fill: CATEGORY_COLORS[idx % CATEGORY_COLORS.length]
+        }))
+        .sort((a, b) => b.amount - a.amount)
+        .slice(0, 5);
+
+      // 5. Recent Transactions
+      const recentTransactions = ledger.slice(0, 10);
+
+      set({
+        stats: { balance, monthlyIncome, monthlyExpense, savingsRate, totalTransactions: monthlyTransactions, averageDaily, averageDailyChange },
+        chartData,
+        categoryData: processedCategories,
+        recentTransactions,
+        rawLedger: ledger,
+        isLoading: false
+      });
+
+    } catch (err: any) {
+      console.error("Dashboard fetch error:", err);
+      set({ error: err.message, isLoading: false });
+    }
   }
-  return true;
+}));
+
+// --- Internal Helper for Chart Data ---
+
+function processChartData(ledger: LedgerEntry[], period: Period): ChartDataPoint[] {
+  const now = new Date();
+  const expenses = ledger.filter(l => l.transaction_type === "expense"); // Chart usually shows detailed spending trends? Or Net? Usually spending. Visual design implies spending.
+
+  // Implementation for "Spending Trend"
+
+  if (period === "week") {
+    // Last 7 days
+    const result = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = subDays(now, i);
+      const dayLabel = format(d, "EEE"); // Mon
+      // Use YYYY-MM-DD for precise filtering
+      const dateKey = format(d, "yyyy-MM-dd");
+
+      // Sum spending for this day
+      const dailyTotal = expenses
+        .filter(l => {
+          const lDateKey = format(new Date(l.created_at), "yyyy-MM-dd");
+          return lDateKey === dateKey;
+        })
+        .reduce((sum, l) => sum + l.amount, 0);
+
+      result.push({
+        label: dayLabel,
+        amount: dailyTotal,
+        date: format(d, "MMM d, yyyy")
+      });
+    }
+    return result;
+  }
+
+  if (period === "month") {
+    // Current Month days
+    const end = endOfMonth(now);
+    const result = [];
+    const daysInMonth = end.getDate();
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      const d = new Date(now.getFullYear(), now.getMonth(), i);
+      const dayLabel = format(d, "MMM d");
+      const dateKey = format(d, "yyyy-MM-dd");
+
+      const dailyTotal = expenses
+        .filter(l => {
+          const lDateKey = format(new Date(l.created_at), "yyyy-MM-dd");
+          return lDateKey === dateKey;
+        })
+        .reduce((sum, l) => sum + l.amount, 0);
+
+      result.push({
+        label: dayLabel,
+        amount: dailyTotal,
+        date: format(d, "MMM d, yyyy")
+      });
+    }
+    return result;
+  }
+
+  if (period === "year") {
+    // Current Year Jan-Dec
+    const result = [];
+    const currentYear = now.getFullYear();
+
+    for (let i = 0; i < 12; i++) {
+      const d = new Date(currentYear, i, 1);
+      const monthLabel = format(d, "MMM");
+
+      const monthlyTotal = expenses
+        .filter(l => {
+          const ld = new Date(l.created_at);
+          return ld.getMonth() === i && ld.getFullYear() === currentYear;
+        })
+        .reduce((sum, l) => sum + l.amount, 0);
+
+      result.push({
+        label: monthLabel,
+        amount: monthlyTotal,
+        date: format(d, "MMMM yyyy")
+      });
+    }
+    return result;
+  }
+
+  return [];
 }

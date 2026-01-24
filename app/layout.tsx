@@ -59,7 +59,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`min-h-screen bg-background font-sans antialiased tracking-tight ${font.variable}`}>
+      <body className={`min-h-screen bg-background font-sans antialiased tracking-tight ${font.variable}`} suppressHydrationWarning>
         <ThemeProvider disableTransitionOnChange>
           <CurrencyProvider>
             {children}

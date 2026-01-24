@@ -5,7 +5,7 @@
 
 :root {
   /* ShopList Pro Theme (Emerald Base) */
-  --background: #f8f9fa;
+  --background: #f9fafb;
   /* Light gray background like the image */
   --foreground: #1c1c1e;
   /* Dark text */
@@ -159,6 +159,8 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+}
 
-  /* Glossy 3D Button Backgrounds - REMOVED */
+.bg-emerald-gradient {
+  @apply bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700;
 }

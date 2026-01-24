@@ -29,7 +29,7 @@ const PRIMARY_TABS: { view: ViewMode; icon: typeof Home; label: string }[] = [
 
 // Secondary tabs (shown in the "More" sheet)
 const SECONDARY_TABS: { view: ViewMode; icon: typeof Home; label: string }[] = [
-  { view: "analytics", icon: PieChart, label: "Analytics" },
+
   { view: "maintenance", icon: Wrench, label: "Maintenance" },
   { view: "bills", icon: CalendarClock, label: "Bills" },
   { view: "settings", icon: Settings, label: "Settings" },

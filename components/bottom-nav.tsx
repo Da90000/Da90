@@ -25,7 +25,7 @@ const PRIMARY_TABS = [
 ];
 
 const SECONDARY_TABS = [
-    { id: "analytics", label: "Analytics", icon: PieChart },
+
     { id: "maintenance", label: "Maintenance", icon: Wrench },
     { id: "bills", label: "Bills", icon: CalendarClock },
     { id: "settings", label: "Settings", icon: Settings },
@@ -55,7 +55,7 @@ export function BottomNav({ currentView, onViewChange, shoppingListCount }: Bott
                                 )}
                             >
                                 <div className="relative">
-                                    <tab.icon className={cn("h-6 w-6", isActive && "fill-current")} />
+                                    <tab.icon className={cn("h-6 w-6")} />
                                     {tab.id === "market" && shoppingListCount > 0 && (
                                         <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
                                             {shoppingListCount}
