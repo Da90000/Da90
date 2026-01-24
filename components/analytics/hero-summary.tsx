@@ -48,42 +48,42 @@ export const HeroSummary = ({ totalSpent, transactionCount = 0 }: HeroSummaryPro
 
                 {/* Header Section */}
                 <div className="space-y-1">
-                    <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                        Financial Insights
+                    <h1 className="text-3xl font-bold tracking-tight text-[#1A2151]">
+                        Total Balance
                     </h1>
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-sm text-slate-400">
                         Track your spending patterns and trends
                     </p>
                 </div>
 
-                {/* Time Selector (Visual) */}
-                <button className="self-start flex items-center gap-2 px-4 py-2 rounded-lg border border-border/50 bg-card/50 hover:bg-accent/50 transition-colors">
-                    <Calendar className="w-4 h-4 text-muted-foreground" />
-                    <span className="text-sm font-medium">This Month</span>
-                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                {/* Time Selector - Pailo Style */}
+                <button className="self-start flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#F8FAFE] hover:bg-[#F1F5F9] transition-all active:scale-95 border-none">
+                    <Calendar className="w-4 h-4 text-[#63D3D5]" />
+                    <span className="text-sm font-bold text-[#1A2151] tracking-tight">This Month</span>
+                    <ChevronDown className="w-4 h-4 text-slate-400" />
                 </button>
             </div>
 
             <div className="mt-8 grid gap-4">
-                {/* Main Amount */}
+                {/* Main Amount - Large and Bold */}
                 <div>
-                    <div className="text-5xl font-bold tracking-tight text-foreground">
+                    <div className="text-6xl font-bold tracking-tight text-[#1A2151]">
                         {formatPrice(totalSpent)}
                     </div>
-                    <div className="mt-2 text-sm text-muted-foreground">
+                    <div className="mt-2 text-sm text-slate-400 font-medium">
                         {dateRange}
                     </div>
                 </div>
 
-                {/* Badges */}
+                {/* Badges - Soft Pill-Shaped */}
                 <div className="flex flex-wrap items-center gap-3 mt-2">
-                    <div className={cn("flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium", status.bgClass)}>
+                    <div className={cn("flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold shadow-sm", status.bgClass)}>
                         <StatusIcon className="w-4 h-4" />
                         {status.label}
                     </div>
 
                     {transactionCount > 0 && (
-                        <div className="flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium bg-secondary text-secondary-foreground">
+                        <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold bg-[#63D3D5]/10 text-[#63D3D5] shadow-sm">
                             <span className="text-xs">📊</span>
                             {transactionCount} transactions
                         </div>

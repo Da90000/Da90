@@ -4,121 +4,113 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Modern SaaS Light Theme (Stripe-like) */
-  --background: #f8fafc;
-  /* Slate 50 */
-  --foreground: #0f172a;
-  /* Slate 900 */
-  --card: #ffffff;
-  --card-foreground: #0f172a;
-  --popover: #ffffff;
-  --popover-foreground: #0f172a;
+  /* ShopList Pro Theme (Emerald Base) */
+  --background: #f8f9fa;
+  /* Light gray background like the image */
+  --foreground: #1c1c1e;
+  /* Dark text */
 
-  /* Vibrant Blue Primary */
-  --primary: #2563eb;
-  /* Blue 600 */
+  --card: #ffffff;
+  --card-foreground: #1c1c1e;
+
+  --popover: #ffffff;
+  --popover-foreground: #1c1c1e;
+
+  --primary: #10b981;
+  /* Emerald 500 */
   --primary-foreground: #ffffff;
 
-  --secondary: #ffffff;
-  --secondary-foreground: #334155;
-  /* Slate 700 */
+  --secondary: #f3f4f6;
+  --secondary-foreground: #1f2937;
 
-  --muted: #f1f5f9;
-  /* Slate 100 */
-  --muted-foreground: #64748b;
-  /* Slate 500 */
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
 
-  --accent: #f1f5f9;
-  --accent-foreground: #0f172a;
+  --accent: #f0fdf4;
+  /* Light emerald tint */
+  --accent-foreground: #166534;
+  /* Emerald 800 */
 
   --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
+  --destructive-foreground: #fafafa;
 
-  /* Subtle Borders */
-  --border: #e2e8f0;
-  /* Slate 200 */
-  --input: #e2e8f0;
-  --ring: #2563eb;
+  --border: #e5e7eb;
+  --input: #e5e7eb;
+  --ring: #10b981;
 
-  /* Large Radius */
-  --radius: 1.5rem;
-  /* 24px */
+  --radius: 1rem;
+  /* More rounded */
 
-  --chart-1: #2563eb;
-  --chart-2: #3b82f6;
-  --chart-3: #60a5fa;
-  --chart-4: #93c5fd;
-  --chart-5: #bfdbfe;
+  /* Charts */
+  --chart-1: #10b981;
+  --chart-2: #34d399;
+  --chart-3: #6ee7b7;
+  --chart-4: #a7f3d0;
+  --chart-5: #d1fae5;
 
-  --sidebar: #f8fafc;
-  --sidebar-foreground: #0f172a;
-  --sidebar-primary: #2563eb;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1c1c1e;
+  --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f1f5f9;
-  --sidebar-accent-foreground: #0f172a;
-  --sidebar-border: #e2e8f0;
-  --sidebar-ring: #2563eb;
-  --success: oklch(0.7 0.18 145);
-  --success-foreground: oklch(0.12 0 0);
+  --sidebar-accent: #f3f4f6;
+  --sidebar-accent-foreground: #1c1c1e;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #10b981;
+
+  /* Functionals */
+  --success: #10b981;
+  --success-foreground: #ffffff;
 }
 
 .dark {
-  /* Dark SaaS Theme (Slate 900 base) */
-  --background: #0f172a;
-  /* Slate 900 */
-  --foreground: #f8fafc;
-  /* Slate 50 */
-  --card: #1e293b;
-  /* Slate 800 */
-  --card-foreground: #f8fafc;
-  --popover: #0f172a;
-  --popover-foreground: #f8fafc;
+  /* Dark Mode */
+  --background: #18181b;
+  --foreground: #fafafa;
 
-  --primary: #3b82f6;
-  /* Blue 500 - slightly lighter for dark mode */
+  --card: #27272a;
+  --card-foreground: #fafafa;
+
+  --popover: #27272a;
+  --popover-foreground: #fafafa;
+
+  --primary: #10b981;
   --primary-foreground: #ffffff;
 
-  --secondary: #1e293b;
-  --secondary-foreground: #f8fafc;
+  --secondary: #3f3f46;
+  --secondary-foreground: #fafafa;
 
-  --muted: #1e293b;
-  --muted-foreground: #94a3b8;
-  /* Slate 400 */
+  --muted: #3f3f46;
+  --muted-foreground: #a1a1aa;
 
-  --accent: #1e293b;
-  --accent-foreground: #f8fafc;
+  --accent: #064e3b;
+  --accent-foreground: #ecfdf5;
 
   --destructive: #7f1d1d;
-  --destructive-foreground: #f8fafc;
+  --destructive-foreground: #fafafa;
 
-  --border: #334155;
-  /* Slate 700 */
-  --input: #334155;
-  --ring: #3b82f6;
+  --border: #3f3f46;
+  --input: #3f3f46;
+  --ring: #34d399;
 
-  --radius: 1.5rem;
+  --chart-1: #34d399;
+  --chart-2: #10b981;
+  --chart-3: #059669;
+  --chart-4: #047857;
+  --chart-5: #065f46;
 
-  --chart-1: #3b82f6;
-  --chart-2: #60a5fa;
-  --chart-3: #93c5fd;
-  --chart-4: #bfdbfe;
-  --chart-5: #1d4ed8;
-
-  --sidebar: #0f172a;
-  --sidebar-foreground: #f8fafc;
-  --sidebar-primary: #3b82f6;
+  --sidebar: #18181b;
+  --sidebar-foreground: #fafafa;
+  --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #1e293b;
-  --sidebar-accent-foreground: #f8fafc;
-  --sidebar-border: #334155;
-  --sidebar-ring: #3b82f6;
-  --success: oklch(0.7 0.18 145);
-  --success-foreground: oklch(0.12 0 0);
+  --sidebar-accent: #3f3f46;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #3f3f46;
+  --sidebar-ring: #34d399;
 }
 
 @theme inline {
-  --font-sans: 'Geist', 'Geist Fallback';
-  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+  --font-sans: 'Inter', 'Geist', 'sans-serif';
+  --font-mono: 'Geist Mono', 'monospace';
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -167,4 +159,6 @@
   body {
     @apply bg-background text-foreground antialiased;
   }
+
+  /* Glossy 3D Button Backgrounds - REMOVED */
 }

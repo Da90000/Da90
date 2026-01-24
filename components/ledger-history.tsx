@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
-import { Plus, CheckCircle2, Receipt, CreditCard, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { Plus, CheckCircle2, Receipt, CreditCard, MoreVertical, Pencil, Trash2, TrendingUp, Minus } from "lucide-react";
 import { fetchLedger, addTransaction, addDebtPayment, getTotalPaid, getRemainingAmount, deleteTransaction, updateTransaction, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
 import { toast } from "@/hooks/use-toast";
 import {
   Card,
   CardHeader,
   CardTitle,
+  CardDescription,
   CardContent,
 } from "@/components/ui/card";
 import {
@@ -50,6 +51,8 @@ import { useCurrency } from "@/contexts/currency-context";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { FloatingActionBtn } from "@/components/ui/fab";
+import { Badge } from "@/components/ui/badge";
+import { TransactionCard } from "@/components/ui/transaction-card";
 
 function formatDate(iso: string): string {
   try {
@@ -420,11 +423,11 @@ export function LedgerHistory() {
 
   const renderExpenseRow = (r: LedgerEntry) => (
     <>
-      <TableCell className="text-muted-foreground">{formatDate(r.date)}</TableCell>
-      <TableCell className="font-medium">{r.itemName || "—"}</TableCell>
-      <TableCell>{r.category}</TableCell>
-      <TableCell className="text-right tabular-nums">{formatPrice(r.amount)}</TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-muted-foreground px-4 py-3">{formatDate(r.date)}</TableCell>
+      <TableCell className="font-medium px-4 py-3">{r.itemName || "—"}</TableCell>
+      <TableCell className="px-4 py-3">{r.category}</TableCell>
+      <TableCell className="text-right tabular-nums font-medium text-rose-600 dark:text-rose-400 px-4 py-3">-{formatPrice(r.amount)}</TableCell>
+      <TableCell className="text-right px-4 py-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -452,13 +455,13 @@ export function LedgerHistory() {
 
   const renderIncomeRow = (r: LedgerEntry) => (
     <>
-      <TableCell className="text-muted-foreground">{formatDate(r.date)}</TableCell>
-      <TableCell className="font-medium text-emerald-700 dark:text-emerald-400">{r.itemName || "—"}</TableCell>
-      <TableCell>{r.category}</TableCell>
-      <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-400">
+      <TableCell className="text-muted-foreground px-4 py-3">{formatDate(r.date)}</TableCell>
+      <TableCell className="font-medium text-emerald-700 dark:text-emerald-400 px-4 py-3">{r.itemName || "—"}</TableCell>
+      <TableCell className="px-4 py-3">{r.category}</TableCell>
+      <TableCell className="text-right tabular-nums text-emerald-700 dark:text-emerald-400 px-4 py-3">
         +{formatPrice(r.amount)}
       </TableCell>
-      <TableCell className="text-right">
+      <TableCell className="text-right px-4 py-3">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm">
@@ -484,77 +487,84 @@ export function LedgerHistory() {
     </>
   );
 
-  const renderDebtRow = (r: LedgerEntry) => {
+  const renderDebtSmartCard = (r: LedgerEntry) => {
     const isGiven = r.transaction_type === "debt_given";
     const isSettled = r.is_settled === true;
     const totalPaid = getTotalPaid(r);
     const remaining = getRemainingAmount(r);
     const progressPercent = r.amount > 0 ? (totalPaid / r.amount) * 100 : 0;
 
+    // Theme colors
+    const borderColor = isGiven ? "border-l-emerald-500" : "border-l-rose-500";
+    const badgeClass = isGiven ? "bg-emerald-100 text-emerald-700 hover:bg-emerald-100" : "bg-rose-100 text-rose-700 hover:bg-rose-100";
+    const amountClass = isGiven ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+    const progressClass = isGiven ? "bg-emerald-500" : "bg-rose-500";
+
     return (
-      <>
-        <TableCell className="text-muted-foreground">{formatDate(r.date)}</TableCell>
-        <TableCell className={`font-medium ${isSettled ? "line-through text-muted-foreground" : isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}`}>
+      <div
+        key={r.id}
+        className={cn(
+          "p-5 rounded-xl border bg-card shadow-sm hover:shadow-md transition-all flex flex-col gap-4 border-l-4",
+          borderColor,
+          isSettled && "opacity-60"
+        )}
+      >
+        <div className="flex justify-between items-start">
           <div className="space-y-1">
-            <div>
-              {isGiven ? `Given to ${r.entity_name || r.itemName}` : `Borrowed from ${r.entity_name || r.itemName}`}
+            <div className="flex items-center gap-2">
+              <span className="text-lg font-bold">{r.entity_name || r.itemName}</span>
+              <Badge variant="outline" className={cn("border-0 px-2 py-0.5 text-[10px] uppercase tracking-wide font-bold", badgeClass)}>
+                {isGiven ? "Owes You" : "You Owe"}
+              </Badge>
             </div>
-            {!isSettled && (
-              <div className="text-xs space-y-1">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <span>Total: {formatPrice(r.amount)}</span>
-                  <span>•</span>
-                  <span>Paid: {formatPrice(totalPaid)}</span>
-                </div>
-                <div className="font-semibold text-foreground">
-                  Remaining: {formatPrice(remaining)}
-                </div>
-                <Progress value={progressPercent} className="h-1.5 w-24" />
-              </div>
-            )}
+            <p className="text-xs text-muted-foreground">{formatDate(r.date)}</p>
           </div>
-        </TableCell>
-        <TableCell>{r.category}</TableCell>
-        <TableCell className={`text-right tabular-nums ${isSettled ? "text-muted-foreground" : isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}`}>
-          {isGiven ? "-" : "+"}{formatPrice(r.amount)}
-        </TableCell>
-        <TableCell className="text-right">
-          <div className="flex items-center justify-end gap-2">
+          <div className={cn("text-2xl font-bold font-mono tracking-tight", amountClass)}>
+            {formatPrice(remaining)}
+          </div>
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex justify-between text-xs text-muted-foreground font-medium">
+            <span>Progress</span>
+            <span>{Math.round(progressPercent)}%</span>
+          </div>
+          <Progress
+            value={progressPercent}
+            className="h-2"
+            indicatorClassName={progressClass}
+          />
+        </div>
+
+        <div className="flex justify-between items-center pt-2 border-t mt-1">
+          <div className="text-sm text-muted-foreground font-medium">
+            Total: {formatPrice(r.amount)} • Paid: {formatPrice(totalPaid)}
+          </div>
+          <div className="flex items-center gap-2">
             {!isSettled && (
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={() => handleOpenPaymentDialog(r.id, remaining)}
-                className="gap-1"
-              >
-                <CreditCard className="h-4 w-4" />
-                Record Payment
+              <Button size="sm" variant="outline" onClick={() => handleOpenPaymentDialog(r.id, remaining)} className="h-8 shadow-sm">
+                <CreditCard className="w-3.5 h-3.5 mr-2" /> Pay
               </Button>
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
                   <MoreVertical className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={() => handleEditClick(r)}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Edit
+                  <Pencil className="mr-2 h-4 w-4" /> Edit
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={() => handleDeleteClick(r)}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete
+                <DropdownMenuItem onClick={() => handleDeleteClick(r)} className="text-destructive">
+                  <Trash2 className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </TableCell>
-      </>
+        </div>
+      </div>
     );
   };
 
@@ -571,51 +581,67 @@ export function LedgerHistory() {
       <div
         key={r.id}
         className={cn(
-          "rounded-lg border p-4",
+          "rounded-2xl border p-4 shadow-sm transition-all",
           isDebt && !isSettled
-            ? "border-dashed border-2 " + (isGiven ? "border-destructive/50 bg-destructive/5" : "border-emerald-500/50 bg-emerald-500/5")
-            : "border-border bg-card",
-          isSettled && "opacity-60"
+            ? "border-dashed border-2 " + (isGiven ? "border-rose-200 bg-rose-50 dark:border-rose-900/50 dark:bg-rose-950/20" : "border-emerald-200 bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/20")
+            : "border-border bg-card hover:bg-muted/40",
+          isSettled && "opacity-60 bg-muted/20"
         )}
       >
-        <div className="flex items-start justify-between">
-          <div className="flex-1">
-            <p className={cn(
-              "font-medium",
-              isSettled && "line-through text-muted-foreground",
-              !isSettled && isIncome && "text-emerald-700 dark:text-emerald-400",
-              !isSettled && isDebt && (isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"),
-              !isSettled && !isIncome && !isDebt && "text-foreground"
-            )}>
-              {isDebt
-                ? isGiven
-                  ? `Given to ${r.entity_name || r.itemName}`
-                  : `Borrowed from ${r.entity_name || r.itemName}`
-                : r.itemName || "—"}
-            </p>
-            <p className="text-sm text-muted-foreground">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 space-y-1">
+            <div className="flex items-center gap-2">
+              <span className={cn(
+                "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold",
+                isIncome ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" :
+                  isDebt ? (isGiven ? "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-400" : "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400") :
+                    "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-400"
+              )}>
+                {isIncome ? <TrendingUp className="h-4 w-4" /> :
+                  isDebt ? <CreditCard className="h-4 w-4" /> :
+                    <Receipt className="h-4 w-4" />}
+              </span>
+              <p className={cn(
+                "font-semibold text-base",
+                isSettled && "line-through text-muted-foreground",
+                !isSettled && isIncome && "text-emerald-700 dark:text-emerald-400",
+                !isSettled && isDebt && (isGiven ? "text-rose-700 dark:text-rose-400" : "text-emerald-700 dark:text-emerald-400"),
+                !isSettled && !isIncome && !isDebt && "text-foreground"
+              )}>
+                {isDebt
+                  ? isGiven
+                    ? `Given to ${r.entity_name || r.itemName}`
+                    : `Borrowed from ${r.entity_name || r.itemName}`
+                  : r.itemName || "—"}
+              </p>
+            </div>
+
+            <p className="text-xs text-muted-foreground pl-10">
               {formatDate(r.date)} · {r.category}
             </p>
+
             {isDebt && !isSettled && (
-              <div className="mt-2 space-y-1">
+              <div className="mt-3 pl-10 space-y-2">
                 <div className="text-xs text-muted-foreground flex items-center gap-2">
                   <span>Total: {formatPrice(r.amount)}</span>
                   <span>•</span>
                   <span>Paid: {formatPrice(totalPaid)}</span>
                 </div>
-                <div className="text-xs font-semibold text-foreground">
-                  Remaining: {formatPrice(remaining)}
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span>Remaining</span>
+                  <span>{formatPrice(remaining)}</span>
                 </div>
-                <Progress value={progressPercent} className="h-1.5 w-32" />
+                <Progress value={progressPercent} className="h-2 w-full" />
               </div>
             )}
           </div>
+
           <div className="text-right">
             <p className={cn(
-              "text-lg font-semibold tabular-nums",
+              "text-lg font-bold tabular-nums",
               isSettled && "text-muted-foreground",
-              !isSettled && isIncome && "text-emerald-700 dark:text-emerald-400",
-              !isSettled && isDebt && (isGiven ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"),
+              !isSettled && isIncome && "text-emerald-600 dark:text-emerald-400",
+              !isSettled && isDebt && (isGiven ? "text-rose-600 dark:text-rose-400" : "text-emerald-600 dark:text-emerald-400"),
               !isSettled && !isIncome && !isDebt && "text-foreground"
             )}>
               {isIncome ? "+" : isDebt && !isGiven ? "+" : isDebt ? "-" : ""}{formatPrice(r.amount)}
@@ -623,24 +649,22 @@ export function LedgerHistory() {
             {isDebt && !isSettled && (
               <Button
                 size="sm"
-                variant="ghost"
+                variant="outline"
                 onClick={() => handleOpenPaymentDialog(r.id, remaining)}
-                className="mt-2 gap-1 text-xs"
+                className="mt-2 h-7 gap-1 text-[10px] uppercase font-bold tracking-wider"
               >
-                <CreditCard className="h-3 w-3" />
-                Record Payment
+                Pay
               </Button>
             )}
           </div>
         </div>
 
         {/* Edit/Delete Menu */}
-        <div className="mt-3 flex justify-end border-t border-border/50 pt-3">
+        <div className="mt-2 flex justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 gap-2">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground">
                 <MoreVertical className="h-4 w-4" />
-                Actions
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
@@ -664,15 +688,15 @@ export function LedgerHistory() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto">
       {/* Segmented Control / Tab Bar */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
         <div className="inline-flex rounded-lg border border-border bg-secondary p-1">
           <button
             type="button"
             onClick={() => setView("expenses")}
             className={cn(
-              "px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
+              "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "expenses"
                 ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -684,7 +708,7 @@ export function LedgerHistory() {
             type="button"
             onClick={() => setView("income")}
             className={cn(
-              "px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
+              "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "income"
                 ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -696,7 +720,7 @@ export function LedgerHistory() {
             type="button"
             onClick={() => setView("debt")}
             className={cn(
-              "px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
+              "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "debt"
                 ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
@@ -708,19 +732,19 @@ export function LedgerHistory() {
 
         {/* Add Buttons */}
         {view === "expenses" && (
-          <Button onClick={() => setExpenseOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto">
-            <Receipt className="h-5 w-5" />
-            Log Manual Expense
+          <Button onClick={() => setExpenseOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white rounded-xl">
+            <Minus className="h-5 w-5" />
+            Log Expense
           </Button>
         )}
         {view === "income" && (
-          <Button onClick={() => setIncomeOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto">
+          <Button onClick={() => setIncomeOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">
             <Plus className="h-5 w-5" />
             Add Income
           </Button>
         )}
         {view === "debt" && (
-          <Button onClick={() => setDebtOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto">
+          <Button onClick={() => setDebtOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto rounded-xl">
             <Plus className="h-5 w-5" />
             Add Debt
           </Button>
@@ -730,29 +754,17 @@ export function LedgerHistory() {
       {/* Expenses View */}
       {view === "expenses" && (
         <div className="space-y-6">
-          <Card className="max-w-xs">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Expenses
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-9 w-28" />
-              ) : (
-                <p className="text-2xl font-bold tabular-nums text-foreground">
-                  {formatPrice(totalExpenses)}
-                </p>
-              )}
-            </CardContent>
+          <Card className="p-6 mb-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
+              <span className="text-3xl font-bold tracking-tight">{formatPrice(totalExpenses)}</span>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Transaction Ledger</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="block space-y-3 p-4 md:hidden">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Transaction Ledger</h3>
+            <div>
+              <div className="block space-y-3 md:hidden">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="rounded-lg border border-border p-4">
@@ -764,7 +776,17 @@ export function LedgerHistory() {
                 ) : expensesList.length === 0 ? (
                   <p className="py-8 text-center text-muted-foreground">No expenses yet</p>
                 ) : (
-                  expensesList.map((r) => renderMobileCard(r, "expenses"))
+                  expensesList.map((r) => (
+                    <TransactionCard
+                      key={r.id}
+                      title={r.itemName || "Expense"}
+                      subtitle={formatDate(r.date)}
+                      amount={r.amount}
+                      category={r.category}
+                      type="expense"
+                      onClick={() => handleEditClick(r)}
+                    />
+                  ))
                 )}
               </div>
 
@@ -772,11 +794,11 @@ export function LedgerHistory() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Item Name</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="px-4 py-3 w-[150px]">Date</TableHead>
+                      <TableHead className="px-4 py-3">Item Name</TableHead>
+                      <TableHead className="px-4 py-3 w-[150px]">Category</TableHead>
+                      <TableHead className="text-right px-4 py-3 w-[150px]">Amount</TableHead>
+                      <TableHead className="text-right px-4 py-3 w-[50px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -803,7 +825,7 @@ export function LedgerHistory() {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       )}
@@ -811,29 +833,17 @@ export function LedgerHistory() {
       {/* Income View */}
       {view === "income" && (
         <div className="space-y-6">
-          <Card className="max-w-xs">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Total Income
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-9 w-28" />
-              ) : (
-                <p className="text-2xl font-bold tabular-nums text-emerald-700 dark:text-emerald-400">
-                  {formatPrice(totalIncome)}
-                </p>
-              )}
-            </CardContent>
+          <Card className="p-6 mb-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Total Income</span>
+              <span className="text-3xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">{formatPrice(totalIncome)}</span>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Income History</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="block space-y-3 p-4 md:hidden">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Income History</h3>
+            <div>
+              <div className="block space-y-3 md:hidden">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="rounded-lg border border-border p-4">
@@ -845,7 +855,17 @@ export function LedgerHistory() {
                 ) : incomeList.length === 0 ? (
                   <p className="py-8 text-center text-muted-foreground">No income recorded yet</p>
                 ) : (
-                  incomeList.map((r) => renderMobileCard(r, "income"))
+                  incomeList.map((r) => (
+                    <TransactionCard
+                      key={r.id}
+                      title={r.itemName || "Income"}
+                      subtitle={formatDate(r.date)}
+                      amount={r.amount}
+                      category={r.category}
+                      type="income"
+                      onClick={() => handleEditClick(r)}
+                    />
+                  ))
                 )}
               </div>
 
@@ -853,11 +873,11 @@ export function LedgerHistory() {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Source</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="px-4 py-3 w-[150px]">Date</TableHead>
+                      <TableHead className="px-4 py-3">Source</TableHead>
+                      <TableHead className="px-4 py-3 w-[150px]">Category</TableHead>
+                      <TableHead className="text-right px-4 py-3 w-[150px]">Amount</TableHead>
+                      <TableHead className="text-right px-4 py-3 w-[50px]">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -884,7 +904,7 @@ export function LedgerHistory() {
                   </TableBody>
                 </Table>
               </div>
-            </CardContent>
+            </div>
           </Card>
         </div>
       )}
@@ -892,35 +912,25 @@ export function LedgerHistory() {
       {/* Debt View */}
       {view === "debt" && (
         <div className="space-y-6">
-          <Card className="max-w-xs">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Active Debt
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <Skeleton className="h-9 w-28" />
-              ) : (
-                <p className={cn(
-                  "text-2xl font-bold tabular-nums",
-                  totalDebt >= 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"
-                )}>
-                  {totalDebt >= 0 ? "-" : "+"}{formatPrice(Math.abs(totalDebt))}
-                </p>
-              )}
-            </CardContent>
+          <Card className="p-6 mb-6">
+            <div className="flex flex-col gap-2">
+              <span className="text-sm font-medium text-muted-foreground">Active Debt</span>
+              <span className={cn(
+                "text-3xl font-bold tracking-tight",
+                totalDebt >= 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"
+              )}>
+                {totalDebt >= 0 ? "-" : "+"}{formatPrice(Math.abs(totalDebt))}
+              </span>
+            </div>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Debt History</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="block space-y-3 p-4 md:hidden">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-4">Debt History</h3>
+            <div>
+              <div className="flex flex-col gap-4">
                 {loading ? (
                   Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border border-border p-4">
+                    <div key={i} className="rounded-lg border p-4">
                       <Skeleton className="mb-2 h-5 w-3/4" />
                       <Skeleton className="h-4 w-1/2" />
                       <Skeleton className="mt-2 h-5 w-20" />
@@ -929,87 +939,21 @@ export function LedgerHistory() {
                 ) : debtList.length === 0 ? (
                   <p className="py-8 text-center text-muted-foreground">No active debts</p>
                 ) : (
-                  debtList.map((r) => renderMobileCard(r, "debt"))
+                  debtList.map((r) => renderDebtSmartCard(r))
                 )}
               </div>
-
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Amount</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      Array.from({ length: LEDGER_LOADING_ROWS }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                          <TableCell className="text-right"><Skeleton className="h-4 w-20 ml-auto" /></TableCell>
-                        </TableRow>
-                      ))
-                    ) : debtList.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                          No active debts
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      debtList.map((r) => (
-                        <TableRow key={r.id} className={r.is_settled ? "opacity-60" : ""}>
-                          {renderDebtRow(r)}
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
+            </div>
           </Card>
 
           {/* Settled Debts Section */}
           {settledDebtList.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-muted-foreground">Settled History</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="block space-y-3 p-4 md:hidden">
-                  {settledDebtList.map((r) => (
-                    <div key={r.id} className="opacity-60">
-                      {renderMobileCard(r, "debt")}
-                    </div>
-                  ))}
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold text-muted-foreground mb-4">Settled History</h3>
+              <div>
+                <div className="flex flex-col gap-4">
+                  {settledDebtList.map((r) => renderDebtSmartCard(r))}
                 </div>
-
-                <div className="hidden md:block">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Description</TableHead>
-                        <TableHead>Category</TableHead>
-                        <TableHead className="text-right">Amount</TableHead>
-                        <TableHead className="text-right">Action</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {settledDebtList.map((r) => (
-                        <TableRow key={r.id} className="opacity-60">
-                          {renderDebtRow(r)}
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </CardContent>
+              </div>
             </Card>
           )}
         </div>

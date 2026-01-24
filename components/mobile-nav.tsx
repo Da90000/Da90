@@ -64,9 +64,9 @@ export function MobileNav({
         onNavigate={onViewChange}
       />
 
-      {/* Bottom Navigation Bar - Primary Items + Menu */}
+      {/* Bottom Navigation Bar - Pailo Floating Island */}
       <nav
-        className="fixed bottom-6 left-6 right-6 z-50 flex md:hidden items-center justify-around rounded-full bg-white shadow-[0_8px_40px_-12px_rgba(0,0,0,0.2)] py-2 border border-slate-100"
+        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background/80 px-2 py-2 backdrop-blur-lg"
         role="navigation"
         aria-label="Main"
       >
@@ -78,18 +78,21 @@ export function MobileNav({
               key={view}
               type="button"
               onClick={() => onViewChange(view)}
-              className="relative flex flex-1 flex-col items-center justify-center gap-1 transition-all active:scale-95"
+              className="relative flex flex-1 flex-col items-center justify-center gap-1 p-2 transition-colors"
               aria-current={isActive ? "page" : undefined}
               aria-label={label}
             >
-              <div className={`relative p-2.5 rounded-full transition-all duration-300 ${isActive ? "bg-blue-50 text-blue-600" : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"}`}>
+              <div className={`relative ${isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}>
                 <Icon className="h-6 w-6" aria-hidden />
                 {view === "market" && shoppingListCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 border-2 border-white px-1 text-[10px] font-bold text-white shadow-sm">
+                  <span className="absolute -right-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive border-[1.5px] border-background px-1 text-[10px] font-medium text-destructive-foreground">
                     {shoppingListCount > 99 ? "99+" : shoppingListCount}
                   </span>
                 )}
               </div>
+              <span className={`text-[10px] font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                {label}
+              </span>
             </button>
           );
         })}
@@ -98,21 +101,24 @@ export function MobileNav({
         <button
           type="button"
           onClick={() => setMoreOpen(true)}
-          className="relative flex flex-1 flex-col items-center justify-center gap-1 transition-all active:scale-95"
+          className="relative flex flex-1 flex-col items-center justify-center gap-1 p-2 transition-colors"
           aria-label="More options"
         >
-          <div className={`relative p-2.5 rounded-full transition-all duration-300 ${moreOpen || SECONDARY_TABS.some(tab => tab.view === currentView)
-              ? "bg-blue-50 text-blue-600"
-              : "text-slate-400 hover:bg-slate-50 hover:text-slate-600"
+          <div className={`relative ${moreOpen || SECONDARY_TABS.some(tab => tab.view === currentView)
+            ? "text-foreground"
+            : "text-muted-foreground hover:text-foreground"
             }`}>
             <Grid3x3 className="h-6 w-6" aria-hidden />
           </div>
+          <span className={`text-[10px] font-medium ${moreOpen || SECONDARY_TABS.some(tab => tab.view === currentView) ? "text-foreground" : "text-muted-foreground"}`}>
+            More
+          </span>
         </button>
       </nav>
 
       {/* "More" Sheet - Secondary Items */}
       <Sheet open={moreOpen} onOpenChange={setMoreOpen}>
-        <SheetContent side="bottom" className="h-auto max-h-[80vh] pb-[env(safe-area-inset-bottom)]">
+        <SheetContent side="bottom" className="h-auto pb-8">
           <SheetHeader>
             <SheetTitle>More Options</SheetTitle>
           </SheetHeader>
@@ -125,14 +131,14 @@ export function MobileNav({
                   key={view}
                   type="button"
                   onClick={() => handleSecondaryItemClick(view)}
-                  className={`flex flex-col items-center justify-center gap-2 p-4 rounded-lg transition-all active:scale-95 ${isActive
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-secondary text-foreground hover:bg-secondary/80"
+                  className={`flex flex-col items-center justify-center gap-2 rounded-lg p-4 transition-colors ${isActive
+                    ? "bg-secondary text-secondary-foreground"
+                    : "hover:bg-secondary/50 text-foreground"
                     }`}
                   aria-current={isActive ? "page" : undefined}
                   aria-label={label}
                 >
-                  <Icon className="h-7 w-7" aria-hidden />
+                  <Icon className="h-6 w-6" aria-hidden />
                   <span className="text-xs font-medium">{label}</span>
                 </button>
               );

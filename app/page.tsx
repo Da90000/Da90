@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { AnalyticsView } from "@/components/analytics-view";
 import { BillTracker } from "@/components/bill-tracker";
+import { BottomNav } from "@/components/bottom-nav";
 import { DashboardView } from "@/components/dashboard-view";
 import { Header } from "@/components/header";
 import { LedgerHistory } from "@/components/ledger-history";
@@ -81,12 +82,12 @@ export default function ShopListApp() {
       } finally {
         setIsLoaded(true);
       }
-      
+
       // Always load shopping list from localStorage, regardless of database fetch success/failure
       // This ensures shopping list is restored even if database fetch fails
       setShoppingList(getShoppingList());
     };
-    
+
     loadData();
   }, [isCheckingAuth]);
 
@@ -95,10 +96,10 @@ export default function ShopListApp() {
     try {
       // Generate ID for the item
       const id = crypto.randomUUID();
-      
+
       // Insert into database first
       const dbItem = await addInventoryItemToSupabase(item, id);
-      
+
       if (dbItem) {
         // Database insertion successful - update local storage and UI
         const inventory = getInventory();
@@ -123,7 +124,7 @@ export default function ShopListApp() {
     try {
       // Update locally first for instant UI feedback
       updateInventoryItem(id, updates);
-      
+
       // Update the UI state
       setInventory((prev) =>
         prev.map((item) =>
@@ -218,7 +219,7 @@ export default function ShopListApp() {
         shoppingListCount={shoppingList.length}
       />
 
-      <main className="mx-auto max-w-7xl px-4 pt-8 pb-20 sm:px-6 md:pb-8 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 pt-4 pb-24 sm:px-6 md:pb-8 lg:px-8">
         {currentView === "dashboard" && (
           <DashboardView onNavigate={handleNavigate} />
         )}
@@ -249,6 +250,12 @@ export default function ShopListApp() {
         {currentView === "bills" && <BillTracker />}
         {currentView === "settings" && <SettingsView />}
       </main>
+
+      <BottomNav
+        currentView={currentView}
+        onViewChange={setCurrentView}
+        shoppingListCount={shoppingList.length}
+      />
     </div>
   );
 }
