@@ -5,6 +5,70 @@ export interface CurrencySettings {
   currencyCode: string;
 }
 
+export interface AiSettings {
+  provider: string;
+  apiKey: string;
+  model: string;
+}
+
+const DEFAULT_AI_SETTINGS: AiSettings = {
+  provider: "OpenAI",
+  apiKey: "",
+  model: "gpt-4-turbo",
+};
+
+export const AI_MODELS: Record<string, string[]> = {
+  OpenAI: [
+    'gpt-5.2',
+    'gpt-5.2-pro',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'o3-pro',
+    'o4-mini',
+    'gpt-5',
+    'gpt-4.5-preview',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'gpt-4o-mini',
+    'gpt-4o',
+    'gpt-oss-120b',
+    'gpt-oss-20b',
+  ],
+  Google: [
+    'gemini-3-pro',
+    'gemini-3-flash',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-pro',
+    'gemini-2.0-flash',
+    'gemini-live-2.5-flash-native-audio',
+  ],
+  Anthropic: [
+    'claude-3.5-sonnet',
+    'claude-opus-4.5',
+    'claude-opus-4',
+    'claude-sonnet-4',
+    'claude-3-opus',
+    'claude-3-haiku',
+    'claude-3-sonnet',
+  ],
+  Groq: [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'mixtral-8x7b-32768',
+    'gpt-oss-120b',
+    'gpt-oss-20b',
+    'compoundgroq/compound',
+    'compound-minigroq/compound-mini',
+  ],
+  XAI: [
+    'grok-4.2',
+    'grok-4.1',
+    'grok-4.0',
+  ],
+};
+
 const DEFAULT_CURRENCY: CurrencySettings = {
   currencySymbol: "৳",
   currencyCode: "BDT",
@@ -30,7 +94,7 @@ export async function fetchCurrencySettings(): Promise<CurrencySettings> {
   try {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    
+
     if (!user) {
       return DEFAULT_CURRENCY;
     }
@@ -96,6 +160,102 @@ export async function updateCurrency(
 
     return { success: true, error: null };
   } catch (error) {
+    return { success: false, error };
+  }
+}
+
+/**
+ * Simple obfuscation for API key (Client-side deterrent only).
+ */
+function obfuscateApiKey(key: string): string {
+  if (!key) return "";
+  try {
+    return btoa(key);
+  } catch (e) {
+    return key;
+  }
+}
+
+function deobfuscateApiKey(key: string): string {
+  if (!key) return "";
+  try {
+    return atob(key);
+  } catch (e) {
+    return key;
+  }
+}
+
+/**
+ * Fetches AI settings from Supabase ai_settings table.
+ */
+export async function fetchAiSettings(): Promise<AiSettings> {
+  if (typeof window === "undefined") return DEFAULT_AI_SETTINGS;
+
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) return DEFAULT_AI_SETTINGS;
+
+    const { data, error } = await supabase
+      .from("ai_settings")
+      .select("provider, api_key, model_name")
+      .eq("user_id", user.id)
+      .single();
+
+    if (error || !data) return DEFAULT_AI_SETTINGS;
+
+    return {
+      provider: data.provider || DEFAULT_AI_SETTINGS.provider,
+      apiKey: deobfuscateApiKey(data.api_key || ""),
+      model: data.model_name || DEFAULT_AI_SETTINGS.model,
+    };
+  } catch (error) {
+    console.error("AI Settings Error:", JSON.stringify(error, null, 2));
+    return DEFAULT_AI_SETTINGS;
+  }
+}
+
+/**
+ * Saves AI settings to Supabase ai_settings table.
+ */
+export async function saveAiSettings(
+  provider: string,
+  apiKey: string,
+  model: string
+): Promise<{ success: boolean; error: unknown }> {
+  if (typeof window === "undefined") {
+    return { success: false, error: new Error("Not in browser context") };
+  }
+
+  try {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { success: false, error: new Error("User not authenticated") };
+    }
+
+    const { error } = await supabase
+      .from("ai_settings")
+      .upsert(
+        {
+          user_id: user.id,
+          provider,
+          api_key: obfuscateApiKey(apiKey),
+          model_name: model,
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (error) {
+      console.error("AI Settings Error:", JSON.stringify(error, null, 2));
+      return { success: false, error };
+    }
+
+    return { success: true, error: null };
+  } catch (error) {
+    console.error("AI Settings Error:", JSON.stringify(error, null, 2));
     return { success: false, error };
   }
 }

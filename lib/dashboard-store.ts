@@ -23,6 +23,9 @@ export interface DashboardStats {
   totalTransactions: number;
   averageDaily: number;
   averageDailyChange: number;
+  incomeChange: number;
+  expenseChange: number;
+  balanceChange: number;
 }
 
 export interface ChartDataPoint {
@@ -73,7 +76,18 @@ const CATEGORY_COLORS = [
 
 export const useDashboardStore = create<DashboardState>((set, get) => ({
   period: "month",
-  stats: { balance: 0, monthlyIncome: 0, monthlyExpense: 0, savingsRate: 0, totalTransactions: 0, averageDaily: 0, averageDailyChange: 0 },
+  stats: {
+    balance: 0,
+    monthlyIncome: 0,
+    monthlyExpense: 0,
+    savingsRate: 0,
+    totalTransactions: 0,
+    averageDaily: 0,
+    averageDailyChange: 0,
+    incomeChange: 0,
+    expenseChange: 0,
+    balanceChange: 0
+  },
   chartData: [],
   categoryData: [],
   recentTransactions: [],
@@ -122,15 +136,27 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       let monthlyExpense = 0;
       let monthlyTransactions = 0;
       let lastMonthExpense = 0;
+      let lastMonthIncome = 0;
       const lastMonthDate = subMonths(now, 1);
+      const startOfCurrentMonth = startOfMonth(now);
+      let prevBalanceIncome = 0;
+      let prevBalanceExpense = 0;
 
       ledger.forEach(item => {
         const type = item.transaction_type;
         const amount = item.amount;
         const date = new Date(item.created_at);
 
+        // Global Totals
         if (type === "income") totalIncome += amount;
         if (type === "expense") totalExpense += amount;
+
+        // Previous Balance Calculation (Until Start of this Month)
+        if (date < startOfCurrentMonth) {
+          if (type === "income") prevBalanceIncome += amount;
+          if (type === "expense") prevBalanceExpense += amount;
+        }
+
 
         // Monthly stats check (Current Month)
         if (isSameMonth(date, now) && isSameYear(date, now)) {
@@ -144,10 +170,16 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         // Last Month stats check
         if (isSameMonth(date, lastMonthDate) && isSameYear(date, lastMonthDate)) {
           if (type === "expense") lastMonthExpense += amount;
+          if (type === "income") lastMonthIncome += amount;
         }
       });
 
       const balance = totalIncome - totalExpense;
+      const prevBalance = prevBalanceIncome - prevBalanceExpense;
+      const balanceChange = prevBalance !== 0
+        ? ((balance - prevBalance) / Math.abs(prevBalance)) * 100
+        : 0;
+
       const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpense) / monthlyIncome) * 100 : 0;
 
       // Average Daily Calculation
@@ -160,6 +192,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
       const averageDailyChange = lastMonthDailyAvg > 0
         ? Math.round(((averageDaily - lastMonthDailyAvg) / lastMonthDailyAvg) * 100)
+        : 0;
+
+      const incomeChange = lastMonthIncome > 0
+        ? Math.round(((monthlyIncome - lastMonthIncome) / lastMonthIncome) * 100)
+        : 0;
+
+      const expenseChange = lastMonthExpense > 0
+        ? Math.round(((monthlyExpense - lastMonthExpense) / lastMonthExpense) * 100)
         : 0;
 
       // 3. Process Chart Data
@@ -194,7 +234,18 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       const recentTransactions = ledger.slice(0, 10);
 
       set({
-        stats: { balance, monthlyIncome, monthlyExpense, savingsRate, totalTransactions: monthlyTransactions, averageDaily, averageDailyChange },
+        stats: {
+          balance,
+          monthlyIncome,
+          monthlyExpense,
+          savingsRate,
+          totalTransactions: monthlyTransactions,
+          averageDaily,
+          averageDailyChange,
+          incomeChange,
+          expenseChange,
+          balanceChange
+        },
         chartData,
         categoryData: processedCategories,
         recentTransactions,

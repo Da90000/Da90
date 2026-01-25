@@ -17,6 +17,9 @@ export interface ShoppingListItem {
   /** What the user types in the store; overrides basePrice for totals/ledger. */
   manualPrice?: number;
   quantity: number;
+  unit?: string;
+  note?: string;
+  lastPaidPrice?: number;
   purchased: boolean;
 }
 

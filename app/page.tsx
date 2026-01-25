@@ -27,6 +27,8 @@ import {
   togglePurchased,
   updateQuantity,
   updateItemPrice,
+  updateItemUnit,
+  updateItemNote,
   clearShoppingList,
   fetchInventoryFromSupabase,
   addInventoryItemToSupabase,
@@ -180,6 +182,16 @@ export default function ShopListApp() {
     setShoppingList(getShoppingList());
   }, []);
 
+  const handleUpdateUnit = useCallback((id: string, unit: string) => {
+    updateItemUnit(id, unit);
+    setShoppingList(getShoppingList());
+  }, []);
+
+  const handleUpdateNote = useCallback((id: string, note: string) => {
+    updateItemNote(id, note);
+    setShoppingList(getShoppingList());
+  }, []);
+
   const handleRemoveItem = useCallback((id: string) => {
     removeFromShoppingList(id);
     setShoppingList(getShoppingList());
@@ -243,6 +255,8 @@ export default function ShopListApp() {
             onTogglePurchased={handleTogglePurchased}
             onUpdateQuantity={handleUpdateQuantity}
             onUpdatePrice={handleUpdatePrice}
+            onUpdateUnit={handleUpdateUnit}
+            onUpdateNote={handleUpdateNote}
             onRemoveItem={handleRemoveItem}
             onClearList={handleClearList}
             onGoToInventory={handleGoToInventory}

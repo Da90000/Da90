@@ -15,6 +15,8 @@ interface MarketModeProps {
   onTogglePurchased: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdatePrice: (id: string, price: number | undefined) => void;
+  onUpdateUnit: (id: string, unit: string) => void;
+  onUpdateNote: (id: string, note: string) => void;
   onRemoveItem: (id: string) => void;
   onClearList: () => void;
   onGoToInventory: () => void;
@@ -25,6 +27,8 @@ export function MarketMode({
   onTogglePurchased,
   onUpdateQuantity,
   onUpdatePrice,
+  onUpdateUnit,
+  onUpdateNote,
   onRemoveItem,
   onClearList,
   onGoToInventory,
@@ -124,6 +128,8 @@ export function MarketMode({
                     onTogglePurchased={onTogglePurchased}
                     onUpdateQuantity={onUpdateQuantity}
                     onUpdatePrice={onUpdatePrice}
+                    onUpdateUnit={onUpdateUnit}
+                    onUpdateNote={onUpdateNote}
                     onRemove={onRemoveItem}
                   />
                 ))}

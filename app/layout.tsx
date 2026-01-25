@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from '@/components/ui/toaster'
 import { CurrencyProvider } from '@/contexts/currency-context'
 import { ThemeProvider } from '@/components/theme-provider'
+import { AiChatButton } from '@/components/ai-chat-button'
 import './globals.css'
 
 const font = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -63,6 +64,7 @@ export default function RootLayout({
         <ThemeProvider disableTransitionOnChange>
           <CurrencyProvider>
             {children}
+            <AiChatButton />
             <Toaster />
             <Analytics />
           </CurrencyProvider>

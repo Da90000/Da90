@@ -1,9 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Minus, Plus, Trash2, TrendingUp, TrendingDown } from "lucide-react";
+import { Minus, Plus, Trash2, TrendingUp, TrendingDown, MessageSquarePlus, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import type { ShoppingListItem } from "@/lib/types";
 import { useCurrency } from "@/contexts/currency-context";
 
@@ -12,6 +32,8 @@ interface ShoppingListItemCardProps {
   onTogglePurchased: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
   onUpdatePrice: (id: string, price: number | undefined) => void;
+  onUpdateUnit: (id: string, unit: string) => void;
+  onUpdateNote: (id: string, note: string) => void;
   onRemove: (id: string) => void;
 }
 
@@ -20,35 +42,27 @@ export function ShoppingListItemCard({
   onTogglePurchased,
   onUpdateQuantity,
   onUpdatePrice,
+  onUpdateUnit,
+  onUpdateNote,
   onRemove,
 }: ShoppingListItemCardProps) {
   const { formatPrice, currencySymbol } = useCurrency();
   const effectivePrice = item.manualPrice ?? item.basePrice;
   const [localPrice, setLocalPrice] = useState<number>(effectivePrice);
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [note, setNote] = useState(item.note || "");
 
-  // Sync localPrice with item.manualPrice when the item prop changes
-  // This ensures the input reflects the persisted value after remounts or external updates
-  // Only sync if the input is not currently focused (to avoid interrupting user typing)
+  // Sync local logic
   useEffect(() => {
     if (!isInputFocused) {
-      const currentEffectivePrice = item.manualPrice ?? item.basePrice;
-      setLocalPrice(currentEffectivePrice);
+      setLocalPrice(item.manualPrice ?? item.basePrice);
     }
-  }, [item.manualPrice, item.basePrice, item.id, isInputFocused]);
+  }, [item.manualPrice, item.basePrice, isInputFocused]);
 
-  // Use persisted value for calculations to ensure consistency with stored data
-  const calculatedPrice = item.manualPrice ?? item.basePrice;
-  const percentChange = item.basePrice ? ((calculatedPrice - item.basePrice) / item.basePrice) * 100 : 0;
-  const isPriceIncrease = percentChange > 0;
-  const isPriceDecrease = percentChange < 0;
-  const isSignificantIncrease = percentChange > 10;
-  const isSignificantDecrease = percentChange < -10;
-  const hasPriceChange = Math.abs(percentChange) > 0.01; // Account for floating point precision
-  const itemTotal = calculatedPrice * item.quantity;
+  useEffect(() => {
+    setNote(item.note || "");
+  }, [item.note]);
 
-  // On blur: update manualPrice (or clear it). Never touch basePrice.
-  // manualPrice is only for the current shopping session, not for updating inventory.
   const handlePriceBlur = () => {
     setIsInputFocused(false);
     const val = localPrice;
@@ -61,124 +75,184 @@ export function ShoppingListItemCard({
       onUpdatePrice(item.id, undefined);
       return;
     }
-    // Persist the price change immediately
     onUpdatePrice(item.id, val);
-    // Note: We do NOT update inventory base_price here.
-    // Base price should only be updated through the Edit Item dialog.
-    // The last_paid_price will be updated when finishing shopping.
   };
 
-  const handlePriceFocus = () => {
-    setIsInputFocused(true);
+  const handleNoteSave = () => {
+    onUpdateNote(item.id, note);
   };
+
+  const totalItemPrice = (item.manualPrice ?? item.basePrice) * item.quantity;
+
+  // Trend Logic (Compare effective unit price vs last paid)
+  // item.lastPaidPrice is historical. effectivePrice is current.
+  const lastPaid = item.lastPaidPrice;
+  let trendIcon = null;
+  let trendTooltip = null;
+
+  if (lastPaid) {
+    const diff = effectivePrice - lastPaid;
+    const percent = (diff / lastPaid) * 100;
+
+    if (percent > 0) {
+      trendIcon = <TrendingUp className="h-4 w-4 text-red-500" />;
+      trendTooltip = `Price up ${percent.toFixed(0)}% (Last: ${formatPrice(lastPaid)})`;
+    } else if (percent < 0) {
+      trendIcon = <TrendingDown className="h-4 w-4 text-emerald-500" />;
+      trendTooltip = `Price down ${Math.abs(percent).toFixed(0)}% (Last: ${formatPrice(lastPaid)})`;
+    } else {
+      // Equal
+      trendIcon = <Info className="h-4 w-4 text-muted-foreground" />;
+      trendTooltip = `Same as last purchase (${formatPrice(lastPaid)})`;
+    }
+  }
 
   return (
     <div
-      className={`group flex items-center gap-4 rounded-lg border p-4 transition-all ${
-        item.purchased
-          ? "border-success/30 bg-success/5"
-          : isSignificantIncrease 
-            ? "border-destructive/50 bg-destructive/10" // Highlight if price increased significantly
-          : isSignificantDecrease
-            ? "border-green-500/50 bg-green-500/10" // Highlight if price decreased significantly
-            : "border-border bg-card hover:border-accent/50"
-      }`}
+      className={`relative flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-all ${item.purchased
+          ? "border-emerald-200 bg-emerald-50/50 opacity-60"
+          : "border-border/40"
+        }`}
     >
-      <Checkbox
-        checked={item.purchased}
-        onCheckedChange={() => onTogglePurchased(item.id)}
-        className="h-6 w-6 shrink-0"
-        aria-label={`Mark ${item.name} as purchased`}
-      />
-
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className={`font-medium truncate ${item.purchased ? "text-muted-foreground line-through" : "text-foreground"}`}>
+      {/* Top Row: Checkbox, Name/Base, Total */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Checkbox
+            checked={item.purchased}
+            onCheckedChange={() => onTogglePurchased(item.id)}
+            className="h-6 w-6 rounded-full border-gray-300 data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-500 mt-1"
+          />
+          <div className="min-w-0">
+            <h3 className={`font-bold truncate text-base ${item.purchased ? "line-through text-muted-foreground" : "text-foreground"}`}>
               {item.name}
             </h3>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Base Price: {formatPrice(item.basePrice)}
-            </p>
-            
-            <div className="flex flex-wrap items-center gap-3 mt-1">
-              <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-                {item.category}
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-muted-foreground">
+                Base: {formatPrice(item.basePrice)}
               </span>
-              
-              {/* Actual price input — large enough for touch without zoom */}
-              <div className="flex items-center gap-1">
-                <span className="text-xs text-muted-foreground">{currencySymbol}</span>
-                <input
-                  type="number"
-                  inputMode="decimal"
-                  value={localPrice}
-                  onChange={(e) => setLocalPrice(Number(e.target.value))}
-                  onFocus={handlePriceFocus}
-                  onBlur={handlePriceBlur}
-                  className={`min-h-[44px] w-20 rounded border bg-transparent px-2 text-base tabular-nums focus:outline-none focus:ring-2 focus:ring-ring md:w-16 md:min-h-0 md:border-0 md:border-b md:border-dashed md:px-0 md:text-xs ${
-                    isPriceIncrease && !item.purchased
-                      ? "text-destructive border-destructive font-bold md:border-destructive"
-                      : isPriceDecrease && !item.purchased
-                      ? "text-green-600 dark:text-green-500 border-green-500 font-bold md:border-green-500"
-                      : "border-input md:border-muted-foreground"
-                  }`}
-                />
-                <span className="text-xs text-muted-foreground">each</span>
-                
-                {/* Price Change Badge */}
-                {hasPriceChange && !item.purchased && (
-                  <div
-                    className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      isPriceIncrease
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-green-500/10 text-green-600 dark:text-green-500"
-                    }`}
-                  >
-                    {isPriceIncrease ? (
-                      <>
-                        <TrendingUp className="h-3 w-3" />
-                        +{percentChange.toFixed(0)}%
-                      </>
-                    ) : (
-                      <>
-                        <TrendingDown className="h-3 w-3" />
-                        {percentChange.toFixed(0)}%
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
+              {item.note && (
+                <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800">
+                  {item.note}
+                </span>
+              )}
             </div>
           </div>
+        </div>
 
-          <span
-            className={`font-semibold whitespace-nowrap ${
-              isPriceIncrease && !item.purchased
-                ? "text-destructive"
-                : isPriceDecrease && !item.purchased
-                ? "text-green-600 dark:text-green-500"
-                : "text-foreground"
-            }`}
-          >
-            {formatPrice(itemTotal)}
-          </span>
+        <div className="text-right shrink-0">
+          <p className="text-lg font-bold text-foreground">
+            {formatPrice(totalItemPrice)}
+          </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        {/* Quantity Controls */}
-        <div className="flex items-center gap-1 rounded-md border border-border bg-secondary">
-          <Button variant="ghost" size="icon" className="size-11 shrink-0" onClick={() => onUpdateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1}>
-            <Minus className="h-3 w-3" />
-          </Button>
-          <span className="min-w-[2rem] py-2 text-center text-sm font-medium">{item.quantity}</span>
-          <Button variant="ghost" size="icon" className="size-11 shrink-0" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>
-            <Plus className="h-3 w-3" />
-          </Button>
+      {/* Bottom Row: Controls */}
+      <div className="flex flex-wrap items-center gap-2 mt-1">
+        <Badge variant="secondary" className="bg-gray-100 text-gray-600 hover:bg-gray-200 font-medium">
+          {item.category}
+        </Badge>
+
+        {/* Price Input & Trend */}
+        <div className="flex items-center gap-2 bg-white rounded-lg border border-dashed border-gray-300 px-2 h-9 ml-auto sm:ml-0">
+          <span className="text-xs text-muted-foreground font-medium">{currencySymbol}</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            className="w-16 text-sm font-semibold bg-transparent outline-none tabular-nums placeholder:text-muted-foreground"
+            placeholder="0"
+            value={localPrice}
+            onChange={(e) => setLocalPrice(Number(e.target.value))}
+            onFocus={() => setIsInputFocused(true)}
+            onBlur={handlePriceBlur}
+          />
         </div>
 
-        <Button variant="ghost" size="icon" className="size-11 shrink-0 text-muted-foreground hover:text-destructive opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100" onClick={() => onRemove(item.id)}>
+        {/* Trend Indicator */}
+        {trendIcon && (
+          <TooltipProvider>
+            <Tooltip delayDuration={300}>
+              <TooltipTrigger asChild>
+                <div className="cursor-help opacity-80 hover:opacity-100 transition-opacity">
+                  {trendIcon}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{trendTooltip}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
+
+        <div className="flex-1"></div>
+
+        {/* Note Button */}
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full hover:bg-gray-100 text-muted-foreground">
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-3">
+            <div className="space-y-2">
+              <h4 className="font-medium text-sm">Add Note</h4>
+              <Input
+                placeholder="e.g. Get the green ones"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                className="h-8 text-sm"
+              />
+              <Button size="sm" className="w-full h-8" onClick={handleNoteSave}>
+                Save Note
+              </Button>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        {/* Unit Selector */}
+        <Select value={item.unit || "each"} onValueChange={(val) => onUpdateUnit(item.id, val)}>
+          <SelectTrigger className="h-9 w-[80px] text-xs bg-gray-50 border-gray-200">
+            <SelectValue placeholder="Unit" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="each">Each</SelectItem>
+            <SelectItem value="kg">kg</SelectItem>
+            <SelectItem value="litre">Litre</SelectItem>
+            <SelectItem value="dozen">Dozen</SelectItem>
+            <SelectItem value="pack">Pack</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {/* Quantity Stepper */}
+        <div className="flex items-center h-9 bg-gray-50 rounded-lg border border-gray-200">
+          <button
+            className="h-full px-2 hover:bg-gray-200 rounded-l-lg text-gray-600 transition-colors"
+            onClick={() => onUpdateQuantity(item.id, Math.max(0.1, item.quantity - 1))}
+          >
+            <Minus className="h-3 w-3" />
+          </button>
+          <input
+            type="number"
+            className="w-10 text-center bg-transparent text-sm font-semibold outline-none appearance-none m-0 p-0"
+            value={item.quantity}
+            onChange={(e) => onUpdateQuantity(item.id, Number(e.target.value))}
+            min="0.1"
+            step="0.1"
+          />
+          <button
+            className="h-full px-2 hover:bg-gray-200 rounded-r-lg text-gray-600 transition-colors"
+            onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+          >
+            <Plus className="h-3 w-3" />
+          </button>
+        </div>
+
+        {/* Delete */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-9 w-9 text-muted-foreground hover:text-red-500 hover:bg-red-50 rounded-full"
+          onClick={() => onRemove(item.id)}
+        >
           <Trash2 className="h-4 w-4" />
         </Button>
       </div>

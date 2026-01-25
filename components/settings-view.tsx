@@ -2,17 +2,18 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Download, Loader2, Monitor, Moon, Sun } from "lucide-react";
+import { LogOut, Download, Loader2, Monitor, Moon, Sun, Brain } from "lucide-react";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useCurrency } from "@/contexts/currency-context";
-import { CURRENCIES } from "@/lib/settings-store";
+import { CURRENCIES, fetchAiSettings, saveAiSettings, AI_MODELS } from "@/lib/settings-store";
 
 export function SettingsView() {
   const router = useRouter();
@@ -24,6 +25,11 @@ export function SettingsView() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [updatingCurrency, setUpdatingCurrency] = useState(false);
+  const [aiProvider, setAiProvider] = useState("OpenAI");
+  const [apiKey, setApiKey] = useState("");
+  const [model, setModel] = useState("gpt-4-turbo");
+  const [savingAi, setSavingAi] = useState(false);
+  const [loadingAi, setLoadingAi] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -39,6 +45,22 @@ export function SettingsView() {
     };
     fetchUser();
   }, [supabase.auth]);
+
+  useEffect(() => {
+    const loadAiSettings = async () => {
+      try {
+        const settings = await fetchAiSettings();
+        setAiProvider(settings.provider);
+        setApiKey(settings.apiKey);
+        setModel(settings.model);
+      } catch (error) {
+        console.error("Failed to load AI settings:", error);
+      } finally {
+        setLoadingAi(false);
+      }
+    };
+    loadAiSettings();
+  }, []);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
@@ -129,20 +151,55 @@ export function SettingsView() {
     }
   };
 
+  const handleProviderChange = (value: string) => {
+    setAiProvider(value);
+    const models = AI_MODELS[value];
+    if (models && models.length > 0) {
+      setModel(models[0]);
+    }
+  };
+
+  const handleSaveAiSettings = async () => {
+    setSavingAi(true);
+    try {
+      const result = await saveAiSettings(aiProvider, apiKey, model);
+      if (result.success) {
+        toast({
+          title: "Settings saved",
+          description: "AI assistant configuration updated successfully.",
+        });
+      } else {
+        toast({
+          title: "Failed to save settings",
+          description: (result.error as any)?.message || String(result.error),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Failed to save settings",
+        description: (error as any)?.message || String(error),
+        variant: "destructive",
+      });
+    } finally {
+      setSavingAi(false);
+    }
+  };
+
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground">Settings</h1>
-        <p className="text-muted-foreground">Manage your account and data</p>
+    <div className="flex flex-col gap-8 max-w-3xl mx-auto pb-24">
+      <div className="space-y-1">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Settings</h1>
+        <h2 className="text-muted-foreground text-lg">Manage your account and data</h2>
       </div>
 
       {/* Account Profile Section */}
-      <Card>
+      <Card className="bg-card rounded-2xl border border-border shadow-sm py-6">
         <CardHeader>
           <CardTitle>Account Profile</CardTitle>
           <CardDescription>Your account information and authentication</CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-6">
           {loading ? (
             <>
               <Skeleton className="h-6 w-64 mb-4" />
@@ -161,10 +218,10 @@ export function SettingsView() {
             </div>
           )}
           <Button
-            variant="destructive"
+            variant="outline"
             size="lg"
             onClick={handleSignOut}
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto hover:bg-red-50 hover:text-red-600 hover:border-red-300"
           >
             <LogOut className="mr-2 h-4 w-4" />
             Sign Out
@@ -173,43 +230,133 @@ export function SettingsView() {
       </Card>
 
       {/* Appearance Section */}
-      <Card>
+      <Card className="bg-card rounded-2xl border border-border shadow-sm py-6">
         <CardHeader>
           <CardTitle>Appearance</CardTitle>
           <CardDescription>Customize the look and feel of the application</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-3 gap-2">
-            <Button
-              variant="outline"
-              className={`justify-start gap-2 ${theme === "light" ? "ring-2 ring-primary" : ""}`}
+          <div className="bg-muted p-1 rounded-full inline-flex gap-1">
+            <button
               onClick={() => setTheme("light")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${theme === "light"
+                ? "bg-background text-foreground shadow-sm"
+                : "bg-transparent text-muted-foreground hover:text-foreground"
+                }`}
             >
               <Sun className="h-4 w-4" />
-              <span className="hidden sm:inline">Light</span>
-            </Button>
-            <Button
-              variant="outline"
-              className={`justify-start gap-2 ${theme === "dark" ? "ring-2 ring-primary" : ""}`}
+              <span>Light</span>
+            </button>
+            <button
               onClick={() => setTheme("dark")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${theme === "dark"
+                ? "bg-background text-foreground shadow-sm"
+                : "bg-transparent text-muted-foreground hover:text-foreground"
+                }`}
             >
               <Moon className="h-4 w-4" />
-              <span className="hidden sm:inline">Dark</span>
-            </Button>
-            <Button
-              variant="outline"
-              className={`justify-start gap-2 ${theme === "system" ? "ring-2 ring-primary" : ""}`}
+              <span>Dark</span>
+            </button>
+            <button
               onClick={() => setTheme("system")}
+              className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-all ${theme === "system"
+                ? "bg-background text-foreground shadow-sm"
+                : "bg-transparent text-muted-foreground hover:text-foreground"
+                }`}
             >
               <Monitor className="h-4 w-4" />
-              <span className="hidden sm:inline">System</span>
-            </Button>
+              <span>System</span>
+            </button>
           </div>
         </CardContent>
       </Card>
 
+
+      {/* AI Assistant Settings Section */}
+      <Card className="bg-card rounded-2xl border border-border shadow-sm py-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5 text-emerald-600" />
+            AI Configuration
+          </CardTitle>
+          <CardDescription>Configure your preferred AI provider and model</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {loadingAi ? (
+            <div className="space-y-4">
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2">
+                <Label htmlFor="ai-provider">Provider</Label>
+                <Select value={aiProvider} onValueChange={handleProviderChange}>
+                  <SelectTrigger id="ai-provider">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(AI_MODELS).map((provider) => (
+                      <SelectItem key={provider} value={provider}>
+                        {provider}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="api-key">API Key</Label>
+                <Input
+                  id="api-key"
+                  type="password"
+                  placeholder="sk-..."
+                  value={apiKey}
+                  onChange={(e) => setApiKey(e.target.value)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Your key is stored securely on your device (client-side encryption).
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="model-select">Model Name</Label>
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger id="model-select">
+                    <SelectValue placeholder="Select model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(AI_MODELS[aiProvider] || []).map((m) => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Button
+                onClick={handleSaveAiSettings}
+                disabled={savingAi}
+                className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {savingAi ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save Configuration"
+                )}
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Regional Settings Section */}
-      <Card>
+      <Card className="bg-card rounded-2xl border border-border shadow-sm py-6">
         <CardHeader>
           <CardTitle>Regional Settings</CardTitle>
           <CardDescription>Customize currency and regional preferences</CardDescription>
@@ -244,7 +391,7 @@ export function SettingsView() {
       </Card>
 
       {/* Data Management Section */}
-      <Card>
+      <Card className="bg-card rounded-2xl border border-border shadow-sm py-6">
         <CardHeader>
           <CardTitle>Data Management</CardTitle>
           <CardDescription>Backup your LifeOS data</CardDescription>
@@ -256,11 +403,11 @@ export function SettingsView() {
               This ensures you own your data and can restore it if needed.
             </p>
             <Button
-              variant="outline"
+              variant="secondary"
               size="lg"
               onClick={handleExportData}
               disabled={exporting}
-              className="w-full sm:w-auto"
+              className="w-full sm:w-auto border border-border"
             >
               {exporting ? (
                 <>

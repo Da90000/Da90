@@ -54,12 +54,12 @@ export async function addInventoryItemToSupabase(
     base_price: item.basePrice,
     created_at: new Date().toISOString(),
   };
-  
+
   // Include ID if provided to keep local and Supabase IDs in sync
   if (id) {
     payload.id = id;
   }
-  
+
   const { data, error } = await supabase
     .from("inventory")
     .insert(payload)
@@ -97,12 +97,12 @@ export async function deleteInventoryItemFromSupabase(id: string): Promise<boole
   }
 
   const { error } = await supabase.from("inventory").delete().eq("id", id);
-  
+
   if (error) {
     console.error("Supabase delete error:", error);
     return false;
   }
-  
+
   return true;
 }
 
@@ -116,7 +116,7 @@ export async function addToLedger(
   items: ShoppingListItem[]
 ): Promise<any[] | null> {
   if (!items.length) return [];
-  
+
   if (!supabase) {
     console.warn("Supabase client not initialized. Skipping sync.");
     return null;
@@ -140,7 +140,7 @@ export async function addToLedger(
     console.error("Supabase ledger insert error:", error);
     return null;
   }
-  
+
   return data;
 }
 
@@ -185,12 +185,12 @@ export function addInventoryItem(
   };
   inventory.push(newItem);
   saveInventory(inventory);
-  
+
   // Sync to Supabase in the background (using the same ID for consistency)
   addInventoryItemToSupabase(item, newItem.id).catch((error) => {
     console.error("Failed to sync inventory item to Supabase:", error);
   });
-  
+
   return newItem;
 }
 
@@ -276,7 +276,7 @@ export function deleteInventoryItem(id: string): void {
   const inventory = getInventory();
   const filtered = inventory.filter((item) => item.id !== id);
   saveInventory(filtered);
-  
+
   // Sync to Supabase in the background
   deleteInventoryItemFromSupabase(id).catch((error) => {
     console.error("Failed to sync inventory deletion to Supabase:", error);
@@ -319,6 +319,7 @@ export function addToShoppingList(
     name: inventoryItem.name,
     category: inventoryItem.category,
     basePrice: inventoryItem.basePrice,
+    lastPaidPrice: inventoryItem.lastPaidPrice,
     quantity: 1,
     purchased: false,
   };
@@ -362,6 +363,24 @@ export function updateItemPrice(id: string, price: number | undefined): void {
     item.manualPrice = price;
   }
   saveShoppingList(shoppingList);
+}
+
+export function updateItemUnit(id: string, unit: string): void {
+  const shoppingList = getShoppingList();
+  const item = shoppingList.find((item) => item.id === id);
+  if (item) {
+    item.unit = unit;
+    saveShoppingList(shoppingList);
+  }
+}
+
+export function updateItemNote(id: string, note: string): void {
+  const shoppingList = getShoppingList();
+  const item = shoppingList.find((item) => item.id === id);
+  if (item) {
+    item.note = note;
+    saveShoppingList(shoppingList);
+  }
 }
 
 export function clearShoppingList(): void {

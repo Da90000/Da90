@@ -66,7 +66,7 @@ export function MobileNav({
 
       {/* Bottom Navigation Bar - Pailo Floating Island */}
       <nav
-        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around border-t border-border bg-background/80 px-2 py-2 backdrop-blur-lg"
+        className="fixed bottom-0 left-0 right-0 z-50 flex md:hidden items-center justify-around px-2 py-2 bg-white/70 dark:bg-black/70 backdrop-blur-xl border-t dark:border-white/10"
         role="navigation"
         aria-label="Main"
       >
