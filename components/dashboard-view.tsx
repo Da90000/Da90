@@ -33,6 +33,8 @@ import {
   Sun,
   Moon,
   X,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import { createClient } from "@/lib/supabase/client";
@@ -110,6 +112,20 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   const supabase = createClient();
   const { theme, setTheme } = useTheme();
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isBalanceHidden, setIsBalanceHidden] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("isBalanceHidden") === "true";
+    }
+    return false;
+  });
+
+  const togglePrivacy = () => {
+    const newState = !isBalanceHidden;
+    setIsBalanceHidden(newState);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("isBalanceHidden", newState.toString());
+    }
+  };
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -319,18 +335,31 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             {/* Balance Header & Action Buttons Row */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
               <div>
-                <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm border border-white/30 text-white text-[10px] sm:text-xs font-bold rounded-full mb-3">
-                  TOTAL BALANCE
-                </span>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm border border-white/30 text-white text-[10px] sm:text-xs font-bold rounded-full">
+                    TOTAL BALANCE
+                  </span>
+                  <button
+                    onClick={togglePrivacy}
+                    className="p-1 px-2 hover:bg-white/20 rounded-lg transition-colors text-white/80 hover:text-white"
+                    title={isBalanceHidden ? "Show Balance" : "Hide Balance"}
+                  >
+                    {isBalanceHidden ? (
+                      <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" />
+                    ) : (
+                      <Eye className="w-4 h-4 sm:w-5 sm:h-5" />
+                    )}
+                  </button>
+                </div>
 
                 <div className="flex items-baseline gap-3 mb-2">
-                  <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight">
-                    {formatPrice(stats.balance)}
+                  <h2 className={`text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight transition-opacity duration-200 ${isBalanceHidden ? "opacity-90" : "opacity-100"}`}>
+                    {isBalanceHidden ? "******" : formatPrice(stats.balance)}
                   </h2>
                   {stats.balanceChange !== 0 && (
-                    <span className={`flex items-center gap-1 text-xs sm:text-sm font-semibold ${stats.balanceChange >= 0 ? "text-emerald-100" : "text-red-200"}`}>
-                      {stats.balanceChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                      {stats.balanceChange > 0 ? "+" : ""}{stats.balanceChange.toFixed(1)}%
+                    <span className={`flex items-center gap-1 text-xs sm:text-sm font-semibold px-2 py-0.5 bg-white/10 rounded-full border border-white/10 transition-opacity duration-200 ${stats.balanceChange >= 0 ? "text-emerald-50" : "text-red-100"} ${isBalanceHidden ? "opacity-90" : "opacity-100"}`}>
+                      {stats.balanceChange >= 0 ? <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" /> : <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />}
+                      {isBalanceHidden ? "***" : `${stats.balanceChange > 0 ? "+" : ""}${stats.balanceChange.toFixed(1)}%`}
                     </span>
                   )}
                 </div>
@@ -384,16 +413,16 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                         <Icon className="w-4 h-4 sm:w-5 sm:h-5 text-white" strokeWidth={2.5} />
                       </div>
                       {stat.change && (
-                        <span className={`text-[10px] sm:text-sm font-bold ${stat.changeColor}`}>
-                          {stat.change}
+                        <span className={`text-[10px] sm:text-sm font-bold transition-opacity duration-200 ${stat.changeColor} ${isBalanceHidden ? "opacity-90" : "opacity-100"}`}>
+                          {isBalanceHidden && stat.label !== "Transactions" ? (stat.label === "Savings Rate" ? "***" : "**%") : stat.change}
                         </span>
                       )}
                     </div>
                     <p className="text-emerald-100 text-[10px] sm:text-sm font-medium mb-1 sm:mb-2 truncate">
                       {stat.label}
                     </p>
-                    <p className="text-white text-lg sm:text-3xl font-bold tracking-tight truncate">
-                      {stat.value}
+                    <p className={`text-white text-lg sm:text-3xl font-bold tracking-tight truncate transition-opacity duration-200 ${isBalanceHidden ? "opacity-90" : "opacity-100"}`}>
+                      {isBalanceHidden ? (stat.label === "Transactions" ? "**" : (stat.label === "Savings Rate" ? "***" : "******")) : stat.value}
                     </p>
                   </div>
                 );
@@ -411,7 +440,9 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
             <ArrowUpRight className="w-5 h-5 text-blue-100" />
           </div>
           <p className="text-blue-100 text-sm font-medium mt-4">Average Daily</p>
-          <p className="text-4xl font-bold tracking-tight mt-1 text-white">{formatPrice(stats.averageDaily)}</p>
+          <p className={`text-4xl font-bold tracking-tight mt-1 text-white transition-opacity duration-200 ${isBalanceHidden ? "opacity-90" : "opacity-100"}`}>
+            {isBalanceHidden ? "******" : formatPrice(stats.averageDaily)}
+          </p>
           <p className="text-sm text-blue-100/80 mt-1">
             {stats.averageDailyChange > 0 ? "+" : ""}{stats.averageDailyChange}% from last month
           </p>

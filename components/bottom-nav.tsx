@@ -1,7 +1,22 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
 import { useState } from "react";
-import { Home, Package, ShoppingBag, BookOpen, Menu, CalendarClock, PieChart, Settings, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import {
+    Home,
+    Package,
+    ShoppingBag,
+    BookOpen,
+    Menu,
+    CalendarClock,
+    PieChart,
+    Settings,
+    Wrench,
+    LogOut,
+    TrendingDown
+} from "lucide-react";
 import type { ViewMode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import {
@@ -24,20 +39,47 @@ const PRIMARY_TABS = [
     { id: "expenses", label: "Ledger", icon: BookOpen },
 ];
 
-const SECONDARY_TABS = [
-
-    { id: "maintenance", label: "Maintenance", icon: Wrench },
-    { id: "bills", label: "Bills", icon: CalendarClock },
-    { id: "settings", label: "Settings", icon: Settings },
-];
-
 export function BottomNav({ currentView, onViewChange, shoppingListCount }: BottomNavProps) {
     const [menuOpen, setMenuOpen] = useState(false);
+    const router = useRouter();
+    const supabase = createClient();
 
-    const handleSecondaryClick = (view: string) => {
+    const handleNavigation = (view: string) => {
         onViewChange(view as ViewMode);
         setMenuOpen(false);
     };
+
+    const handleSignOut = async () => {
+        await supabase.auth.signOut();
+        router.push("/login");
+        router.refresh();
+    };
+
+    // Menu Groups Definition
+    const MENU_GROUPS = [
+        {
+            title: "Financial Tools",
+            items: [
+                { id: "analytics", label: "Analytics", icon: PieChart },
+                { id: "expenses", label: "Ledger", icon: BookOpen },
+                { id: "bills", label: "Bills", icon: CalendarClock },
+            ]
+        },
+        {
+            title: "Asset Management",
+            items: [
+                { id: "maintenance", label: "Maintenance", icon: Wrench },
+                { id: "inventory", label: "Inventory", icon: Package },
+            ]
+        },
+        {
+            title: "System & Account",
+            items: [
+                { id: "settings", label: "Settings", icon: Settings },
+                { id: "logout", label: "Log Out", icon: LogOut, isAction: true, onClick: handleSignOut },
+            ]
+        }
+    ];
 
     return (
         <>
@@ -71,7 +113,7 @@ export function BottomNav({ currentView, onViewChange, shoppingListCount }: Bott
                         onClick={() => setMenuOpen(true)}
                         className={cn(
                             "flex flex-col items-center justify-center w-full h-full gap-1",
-                            menuOpen || SECONDARY_TABS.some(t => t.id === currentView) ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                            menuOpen ? "text-primary" : "text-muted-foreground hover:text-foreground"
                         )}
                     >
                         <Menu className="h-6 w-6" />
@@ -81,27 +123,60 @@ export function BottomNav({ currentView, onViewChange, shoppingListCount }: Bott
             </div>
 
             <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-                <SheetContent side="bottom" className="pb-8">
-                    <SheetHeader>
-                        <SheetTitle>Menu</SheetTitle>
+                <SheetContent side="bottom" className="bg-card w-full rounded-t-[1.5rem] border-t border-border/50 max-h-[85vh] overflow-y-auto px-4 pb-8 pt-6">
+                    <SheetHeader className="mb-4 px-2 text-left border-none">
+                        <SheetTitle className="text-xl font-bold text-foreground">Menu</SheetTitle>
                     </SheetHeader>
-                    <div className="grid grid-cols-4 gap-4 py-6">
-                        {SECONDARY_TABS.map((tab) => {
-                            const isActive = currentView === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => handleSecondaryClick(tab.id)}
-                                    className={cn(
-                                        "flex flex-col items-center justify-center gap-2 rounded-lg p-4 transition-colors",
-                                        isActive ? "bg-secondary text-primary" : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
-                                    )}
-                                >
-                                    <tab.icon className="h-6 w-6" />
-                                    <span className="text-xs font-medium">{tab.label}</span>
-                                </button>
-                            );
-                        })}
+
+                    <div className="space-y-6 px-1">
+                        {MENU_GROUPS.map((group, groupIndex) => (
+                            <div key={groupIndex}>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3 pl-2 opacity-70">
+                                    {group.title}
+                                </p>
+                                <ul className="space-y-1">
+                                    {group.items.map((item) => {
+                                        const isActive = currentView === item.id;
+                                        const isLogout = item.id === "logout";
+
+                                        return (
+                                            <li key={item.id}>
+                                                <button
+                                                    onClick={() => {
+                                                        // @ts-ignore - Dynamic item handling
+                                                        item.isAction ? item.onClick?.() : handleNavigation(item.id);
+                                                    }}
+                                                    className={cn(
+                                                        "w-full flex items-center gap-3.5 p-3 rounded-xl transition-all duration-200 text-left",
+                                                        isActive && !isLogout && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium",
+                                                        !isActive && !isLogout && "hover:bg-muted/50 text-foreground/90 hover:text-foreground",
+                                                        isLogout && "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600"
+                                                    )}
+                                                >
+                                                    <div className={cn(
+                                                        "w-9 h-9 flex items-center justify-center rounded-lg transition-colors",
+                                                        isActive && !isLogout ? "bg-emerald-500/20" : "bg-muted/30",
+                                                        isLogout && "bg-red-500/10"
+                                                    )}>
+                                                        <item.icon className={cn(
+                                                            "w-5 h-5",
+                                                            isActive && !isLogout ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
+                                                            isLogout && "text-current"
+                                                        )} strokeWidth={2} />
+                                                    </div>
+                                                    <span className={cn(
+                                                        "text-sm tracking-tight",
+                                                        isActive ? "font-bold" : "font-medium"
+                                                    )}>
+                                                        {item.label}
+                                                    </span>
+                                                </button>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </div>
+                        ))}
                     </div>
                 </SheetContent>
             </Sheet>

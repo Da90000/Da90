@@ -13,14 +13,29 @@
  */
 export async function processUserQuery(query: string, userId: string): Promise<string> {
     try {
-        console.log('Sending query to Server AI API:', { intent: "Proxy", userId });
+        // 1. Detect user's need (savings, budget, spending, etc.)
+        const lowerQuery = query.toLowerCase();
+        let intent = "general";
 
+        if (lowerQuery.includes('spent') || lowerQuery.includes('expense') || lowerQuery.includes('spending')) {
+            intent = "spending";
+        } else if (lowerQuery.includes('income') || lowerQuery.includes('salary') || lowerQuery.includes('earned')) {
+            intent = "income";
+        } else if (lowerQuery.includes('bill') || lowerQuery.includes('subscription')) {
+            intent = "bills";
+        } else if (lowerQuery.includes('savings') || lowerQuery.includes('budget')) {
+            intent = "budgeting";
+        }
+
+        console.log(`Detecting user need: [${intent}] for user: ${userId}`);
+
+        // 2 & 3. Trigger context fetching and send query to server-side API
         const response = await fetch('/api/ai/chat', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ query, userId }),
+            body: JSON.stringify({ query, userId, intent }),
         });
 
         if (!response.ok) {
