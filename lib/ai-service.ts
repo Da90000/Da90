@@ -1,5 +1,15 @@
 /**
- * Orchestrator: Calls the secure server-side AI API endpoint.
+ * AI Service - Pure Financial Advisor
+ * 
+ * This service acts as a READ-ONLY proxy to the AI API endpoint.
+ * The AI is configured as a PURELY ADVISORY financial assistant that:
+ * - Analyzes user's financial data (ledger, bills, inventory)
+ * - Provides insights, summaries, and recommendations
+ * - NEVER suggests UI actions, button clicks, or navigation
+ * - NEVER attempts to modify data or perform transactions
+ * 
+ * All data fetching happens server-side in the API route for security.
+ * This function simply sends the user's query and receives text-based advice.
  */
 export async function processUserQuery(query: string, userId: string): Promise<string> {
     try {

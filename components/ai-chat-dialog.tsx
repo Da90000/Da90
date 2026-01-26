@@ -15,7 +15,21 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-
+/**
+ * AI Chat Dialog Component - Pure Text-Based Advisory Interface
+ * 
+ * This component provides a chat interface for the LifeOS Financial Advisor.
+ * 
+ * Functionality:
+ * - Sends user queries to the AI service via processUserQuery()
+ * - Receives and displays ONLY text-based responses
+ * - NO function calling, action buttons, or UI manipulation
+ * - Simple request/response flow with loading states
+ * 
+ * The AI backend is configured to provide purely advisory responses.
+ * This component does NOT handle or render any function calls, suggested actions,
+ * or interactive elements beyond the chat input/output.
+ */
 
 interface AiChatDialogProps {
     open: boolean;
@@ -35,7 +49,7 @@ export function AiChatDialog({ open, onOpenChange }: AiChatDialogProps) {
         {
             id: "1",
             role: "assistant",
-            content: "Hi! I'm Pailo, your LifeOS Assistant. How can I help you manage your inventory or expenses today?",
+            content: "Hi! I'm Pailo, your LifeOS Financial Advisor. I can analyze your finances and provide insights, budgeting advice, and spending recommendations. How can I help you today?",
         },
     ]);
     const [inputValue, setInputValue] = useState("");

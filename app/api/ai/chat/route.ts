@@ -1,3 +1,24 @@
+/**
+ * LifeOS AI Chat API - Pure Financial Advisor (RAG Implementation)
+ * 
+ * This endpoint implements a PURELY ADVISORY AI assistant with NO UI control capabilities.
+ * 
+ * Architecture:
+ * - Fetches READ-ONLY context data (ledger, bills, inventory) server-side using Supabase Admin
+ * - Sends user query + context to configured AI provider (OpenAI, Groq, XAI, Google, Anthropic)
+ * - Returns text-based financial insights and recommendations ONLY
+ * 
+ * Security:
+ * - All database queries use Supabase Service Role (bypasses RLS for authorized server access)
+ * - API keys are stored obfuscated in the database and deobfuscated server-side
+ * - User ID validation ensures data isolation
+ * 
+ * CRITICAL: NO FUNCTION CALLING
+ * - The request bodies sent to AI providers contain ONLY messages (system + user prompts)
+ * - NO 'functions', 'tools', or 'tool_definitions' parameters are included
+ * - The AI cannot trigger UI actions, navigate pages, or modify data
+ * - All responses are purely informational and advisory
+ */
 import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -110,8 +131,22 @@ export async function POST(req: NextRequest) {
         const provider = aiSettings.provider;
         const model = aiSettings.model_name || "gpt-4-turbo";
 
-        // 3. Construct Prompts
-        const systemPrompt = "You are 'Pailo', the friendly LifeOS AI Assistant. Your goal is to help users manage their finances, inventory, and tasks. You only have access to the data provided in the context. Be concise, professional, and use the '৳' symbol for currency when relevant.";
+        // 3. Construct Prompts - STRICTLY ADVISORY ROLE
+        const systemPrompt = `You are 'Pailo', a professional, purely advisory financial assistant for LifeOS.
+        
+Your sole purpose is to analyze the provided user data and offer insights, summaries, and advice.
+
+CRITICAL RULES:
+- You are READ-ONLY. You can ONLY analyze and provide financial insights.
+- NEVER suggest clicking buttons, logging transactions, or navigating the interface.
+- NEVER mention UI elements like "Go to", "Click on", "Navigate to", or "Add a transaction".
+- NEVER suggest actions the user can take in the app interface.
+- Only provide data analysis, financial advice, budgeting tips, and insights based on the context provided.
+- Always use the ৳ currency symbol when discussing money.
+- If asked to perform an action (like logging an expense), politely explain that you can only provide advice, not perform actions.
+- Be concise, professional, and helpful in your financial guidance.
+
+Your responses should be purely informational and advisory.`;
 
         const userPrompt = `
       User Question: "${query}"
@@ -122,7 +157,9 @@ export async function POST(req: NextRequest) {
       Please answer the user's question based on the provided context. If the context is empty or irrelevant, tell them politely.
     `;
 
-        // 4. Call AI Provider
+        // 4. Call AI Provider (NO FUNCTION CALLING)
+        // IMPORTANT: No 'functions', 'tools', or 'tool_definitions' are included in the request body.
+        // The AI is configured to be purely advisory and cannot trigger UI actions or data mutations.
         let url = "";
         let headers: Record<string, string> = {
             "Content-Type": "application/json",
