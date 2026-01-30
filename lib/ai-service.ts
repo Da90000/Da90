@@ -212,6 +212,9 @@ STRICT ADVISORY RULES:
     }
 }
 
+// This resolves the local/server URL problem.
+const API_BASE_URL = process.env.NEXT_PUBLIC_INTERNAL_URL || 'http://localhost:3000';
+
 /**
  * AI Service Proxy
  * 
@@ -221,7 +224,7 @@ STRICT ADVISORY RULES:
  */
 export async function processUserQuery(query: string, userId: string): Promise<string> {
     try {
-        const response = await fetch('/api/ai/chat', {
+        const response = await fetch(`${API_BASE_URL}/api/ai/chat`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
