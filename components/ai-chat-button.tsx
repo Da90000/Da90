@@ -1,12 +1,37 @@
 "use client";
 
-import { MessageSquare, Sparkles, X } from "lucide-react";
+import { Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AiChatDialog } from "./ai-chat-dialog";
+import { createClient } from "@/lib/supabase/client";
+import { usePathname } from "next/navigation";
 
 export function AiChatButton() {
     const [open, setOpen] = useState(false);
+    const [session, setSession] = useState<any>(null);
+    const pathname = usePathname();
+    const supabase = createClient();
+
+    useEffect(() => {
+        const getSession = async () => {
+            const { data: { session: currentSession } } = await supabase.auth.getSession();
+            setSession(currentSession);
+        };
+
+        getSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+        });
+
+        return () => subscription.unsubscribe();
+    }, [supabase]);
+
+    // Don't show on login page or if no session
+    if (pathname === "/login" || !session) {
+        return null;
+    }
 
     return (
         <>

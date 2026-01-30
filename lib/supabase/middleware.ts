@@ -24,6 +24,10 @@ export async function updateSession(request: NextRequest) {
           )
         },
       },
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     }
   )
 

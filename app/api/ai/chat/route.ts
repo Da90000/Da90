@@ -1,29 +1,8 @@
-/**
- * LifeOS AI Chat API - Pure Financial Advisor (RAG Implementation)
- * 
- * This endpoint implements a PURELY ADVISORY AI assistant with NO UI control capabilities.
- * 
- * Architecture:
- * - Fetches READ-ONLY context data (ledger, bills, inventory) server-side using Supabase Admin
- * - Sends user query + context to configured AI provider (OpenAI, Groq, XAI, Google, Anthropic)
- * - Returns text-based financial insights and recommendations ONLY
- * 
- * Security:
- * - All database queries use Supabase Service Role (bypasses RLS for authorized server access)
- * - API keys are stored obfuscated in the database and deobfuscated server-side
- * - User ID validation ensures data isolation
- * 
- * CRITICAL: NO FUNCTION CALLING
- * - The request bodies sent to AI providers contain ONLY messages (system + user prompts)
- * - NO 'functions', 'tools', or 'tool_definitions' parameters are included
- * - The AI cannot trigger UI actions, navigate pages, or modify data
- * - All responses are purely informational and advisory
- */
-import { createClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
+import { fetchContextData } from '@/lib/ai-service';
+import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase Admin client with Service Role Key to bypass RLS
-// We wrap this to catch if environment variables are missing
 const getSupabaseAdmin = () => {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -32,11 +11,16 @@ const getSupabaseAdmin = () => {
         throw new Error("Missing Supabase environment variables (URL or SERVICE_ROLE_KEY)");
     }
 
-    return createClient(url, key);
+    return createClient(url, key, {
+        auth: {
+            autoRefreshToken: false,
+            persistSession: false,
+        },
+    });
 };
 
 /**
- * Simple deobfuscation for API key (mirrors client-side obfuscation).
+ * Simple deobfuscation for API key.
  */
 function deobfuscateKey(key: string): string {
     if (!key) return "";
@@ -56,63 +40,12 @@ export async function POST(req: NextRequest) {
         }
 
         const supabaseAdmin = getSupabaseAdmin();
-        const lowerQuery = query.toLowerCase();
-        let context: any = "No specific database context found. Answer generally based on LifeOS context.";
-        let intent = "general";
 
-        // 1. Intent Detection & Data Retrieval
-        try {
-            if (lowerQuery.includes('spent') || lowerQuery.includes('expense') || lowerQuery.includes('spending')) {
-                intent = "expenses";
-                const { data, error } = await supabaseAdmin
-                    .from('ledger')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .eq('transaction_type', 'expense')
-                    .order('created_at', { ascending: false })
-                    .limit(50);
-                if (!error) context = { type: 'recent_expenses', data };
-            }
-            else if (lowerQuery.includes('income') || lowerQuery.includes('salary') || lowerQuery.includes('earned')) {
-                intent = "income";
-                const { data, error } = await supabaseAdmin
-                    .from('ledger')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .eq('transaction_type', 'income')
-                    .order('created_at', { ascending: false })
-                    .limit(50);
-                if (!error) context = { type: 'recent_income', data };
-            }
-            else if (lowerQuery.includes('bill') || lowerQuery.includes('subscription')) {
-                intent = "bills";
-                const { data, error } = await supabaseAdmin
-                    .from('recurring_bills')
-                    .select('*')
-                    .eq('user_id', userId);
-                if (!error) context = { type: 'recurring_bills', data };
-            }
-            else if (lowerQuery.includes('maintenance') || lowerQuery.includes('service')) {
-                intent = "maintenance";
-                const { data, error } = await supabaseAdmin
-                    .from('maintenance_items')
-                    .select('*')
-                    .eq('user_id', userId);
-                if (!error) context = { type: 'maintenance_records', data };
-            }
-            else if (lowerQuery.includes('inventory') || lowerQuery.includes('stock') || lowerQuery.includes('have')) {
-                intent = "inventory";
-                const { data, error } = await supabaseAdmin
-                    .from('inventory')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .limit(100);
-                if (!error) context = { type: 'inventory_items', data };
-            }
-        } catch (dbError) {
-            console.error("Database Context Fetch Error:", dbError);
-            // Non-fatal, proceed with default context
-        }
+        // 1. Unified Context Fetching (RAG Implementation)
+        const contextData = await fetchContextData(userId);
+
+        // Size Check Logging
+        console.log("RAG Context Size:", JSON.stringify(contextData).length / 1024, "KB");
 
         // 2. Fetch User AI Settings
         const { data: aiSettings, error: settingsError } = await supabaseAdmin
@@ -131,21 +64,20 @@ export async function POST(req: NextRequest) {
         const provider = aiSettings.provider;
         const model = aiSettings.model_name || "gpt-4-turbo";
 
-        // 3. Construct Prompts - STRICTLY ADVISORY ROLE
-        const systemPrompt = "You are a professional, purely advisory financial assistant for LifeOS. Your sole purpose is to analyze the provided user data and offer insights, summaries, and advice. **NEVER suggest clicking a button, logging a transaction, or navigating the user's interface.** Answer all questions using the ৳ currency symbol.";
+        // 3. Construct Prompts
+        const systemPrompt = `You are a Specialized Financial Advisor for LifeOS. Your sole purpose is to analyze the provided user data and offer insights, balance summaries, trends, and maintenance recommendations. 
 
-        const userPrompt = `
-      User Question: "${query}"
-      
-      Database Context (JSON):
-      ${JSON.stringify(context)}
-      
-      Please answer the user's question based on the provided context. If the context is empty or irrelevant, tell them politely.
-    `;
+STRICT ADVISORY RULES:
+- NEVER suggest UI actions, button clicks, or navigating the user's interface.
+- NEVER suggest creating, modifying, or deleting data.
+- NEVER suggest logging a transaction or "Add" actions.
+- strictly forbid from creating data or performing any system operations.
+- Answer all questions using the ৳ currency symbol.
+- Base your analysis strictly on the provided JSON data context.`;
 
-        // 4. Call AI Provider (NO FUNCTION CALLING)
-        // IMPORTANT: No 'functions', 'tools', or 'tool_definitions' are included in the request body.
-        // The AI is configured to be purely advisory and cannot trigger UI actions or data mutations.
+        const userPrompt = `The user's question is: "${query}".\n\nANALYZE THIS DATA:\n${JSON.stringify(contextData, null, 2)}`;
+
+        // 4. Call AI Provider
         let url = "";
         let headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -180,7 +112,6 @@ export async function POST(req: NextRequest) {
 
             case "XAI":
                 url = "https://api.x.ai/v1/chat/completions";
-                headers["Authorization"] = `Bearer ${apiKey}`;
                 body = {
                     model,
                     messages: [
@@ -216,60 +147,42 @@ export async function POST(req: NextRequest) {
                 break;
 
             default:
-                return new Response(JSON.stringify({ response: `Provider '${provider}' is not yet supported in the API.` }), { status: 200 });
+                return new Response(JSON.stringify({ response: `Provider '${provider}' is not supported.` }), { status: 200 });
         }
 
-        // CRITICAL DEBUG LOGS
-        console.log(`[AI Call] Provider: ${provider}, Model: ${model}`);
-        console.log(`[AI Call] URL: ${url}`);
-        const maskedKey = apiKey ? `${apiKey.substring(0, 8)}...${apiKey.slice(-4)}` : "missing";
-        console.log(`[AI Call] Auth Header: ${headers["Authorization"] ? `Bearer ${maskedKey}` : headers["x-api-key"] ? `x-api-key ${maskedKey}` : "None"}`);
+        const aiResponse = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify(body)
+        });
 
-        try {
-            const aiResponse = await fetch(url, {
-                method: "POST",
-                headers,
-                body: JSON.stringify(body)
-            });
-
-            if (!aiResponse.ok) {
-                const errorData = await aiResponse.text();
-                console.error(`AI Provider Error (${provider} - ${aiResponse.status}):`, errorData);
-                return new Response(JSON.stringify({
-                    response: `The AI provider (${provider}) returned an error: ${aiResponse.statusText}. Please verify your API settings.`,
-                    error: errorData
-                }), { status: 200 }); // Status 200 used to allow the app to show the error message gracefully
-            }
-
-            const data = await aiResponse.json();
-            let textResponse = "No response generated.";
-
-            if (provider === "Google") {
-                textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || textResponse;
-            } else if (provider === "Anthropic") {
-                textResponse = data.content?.[0]?.text || textResponse;
-            } else {
-                textResponse = data.choices?.[0]?.message?.content || textResponse;
-            }
-
-            return new Response(JSON.stringify({ response: textResponse }), { status: 200 });
-
-        } catch (fetchError: any) {
-            console.error("External AI Fetch Crash:", fetchError);
+        if (!aiResponse.ok) {
+            const errorData = await aiResponse.text();
+            console.error(`AI Provider Error (${provider} - ${aiResponse.status}):`, errorData);
             return new Response(JSON.stringify({
-                error: "Network Error",
-                message: `Failed to reach ${provider}. ${fetchError.message}`
-            }), { status: 500 });
+                response: `The AI provider (${provider}) returned an error. Please verify your API settings.`,
+                error: errorData
+            }), { status: 200 });
         }
+
+        const data = await aiResponse.json();
+        let textResponse = "No response generated.";
+
+        if (provider === "Google") {
+            textResponse = data.candidates?.[0]?.content?.parts?.[0]?.text || textResponse;
+        } else if (provider === "Anthropic") {
+            textResponse = data.content?.[0]?.text || textResponse;
+        } else {
+            textResponse = data.choices?.[0]?.message?.content || textResponse;
+        }
+
+        return new Response(JSON.stringify({ response: textResponse }), { status: 200 });
 
     } catch (error: any) {
-        console.error("Critical AI Route Error:", {
-            message: error?.message,
-            stack: error?.stack,
-        });
-        return new Response(JSON.stringify({
-            error: "Internal Server Error",
-            message: error?.message || "Unknown error"
-        }), { status: 500 });
+        console.error("AI RAG CRITICAL FAILURE:", error);
+        // Log the environment status
+        console.error("Debug Context: Service Key Loaded?", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+
+        return new Response(JSON.stringify({ error: "Internal processing error." }), { status: 500 });
     }
 }
