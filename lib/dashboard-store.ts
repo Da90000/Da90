@@ -13,7 +13,9 @@ export interface LedgerEntry {
   category: string;
   amount: number;
   transaction_type: "income" | "expense" | "debt_given" | "debt_taken";
+  is_settled?: boolean;
 }
+
 
 export interface DashboardStats {
   balance: number;
@@ -113,25 +115,47 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     try {
       if (!supabase) throw new Error("Supabase client not initialized");
 
-      // 1. Fetch ALL Ledger Entries (Income & Expense)
-      // optimizing selection to just needed fields
+      // 1. Fetch ALL Ledger Entries
       const { data, error } = await supabase
         .from("ledger")
-        .select("id, created_at, item_name, category, amount, transaction_type")
+        .select("id, created_at, item_name, category, amount, transaction_type, is_settled")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+
+      // 1b. Fetch Debt Payments to calculate true unsettled amounts
+      const { data: paymentsData, error: paymentsError } = await supabase
+        .from("debt_payments")
+        .select("ledger_id, amount, payment_date");
+
+      if (paymentsError) console.error("Error fetching debt payments:", paymentsError);
+
+      const paymentsMap = new Map<string, { total: number; history: { amount: number, date: Date }[] }>();
+      if (paymentsData) {
+        paymentsData.forEach((p: any) => {
+          const current = paymentsMap.get(p.ledger_id) || { total: 0, history: [] };
+          current.total += Number(p.amount);
+          current.history.push({ amount: Number(p.amount), date: new Date(p.payment_date) });
+          paymentsMap.set(p.ledger_id, current);
+        });
+      }
 
       const ledger = (data as any[])?.map(row => ({
         ...row,
         amount: Number(row.amount) || 0,
         transaction_type: row.transaction_type || "expense",
+        is_settled: row.is_settled === true
       })) || [];
 
       // 2. Calculate Stats
       const now = new Date();
       let totalIncome = 0;
       let totalExpense = 0;
+
+      // Asset/Liability Trackers
+      let netDebtAsset = 0;
+      let netDebtLiability = 0;
+
       let monthlyIncome = 0;
       let monthlyExpense = 0;
       let monthlyTransactions = 0;
@@ -139,23 +163,76 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       let lastMonthIncome = 0;
       const lastMonthDate = subMonths(now, 1);
       const startOfCurrentMonth = startOfMonth(now);
-      let prevBalanceIncome = 0;
-      let prevBalanceExpense = 0;
+
+      // Previous Balance Components
+      let prevTotalIncome = 0;
+      let prevTotalExpense = 0;
+      let prevDebtAsset = 0;
+      let prevDebtLiability = 0;
 
       ledger.forEach(item => {
         const type = item.transaction_type;
         const amount = item.amount;
         const date = new Date(item.created_at);
 
-        // Global Totals
-        if (type === "income") totalIncome += amount;
-        if (type === "expense") totalExpense += amount;
-
-        // Previous Balance Calculation (Until Start of this Month)
-        if (date < startOfCurrentMonth) {
-          if (type === "income") prevBalanceIncome += amount;
-          if (type === "expense") prevBalanceExpense += amount;
+        // --- Standard Income / Expense ---
+        if (type === "income") {
+          totalIncome += amount;
+          if (date < startOfCurrentMonth) prevTotalIncome += amount;
         }
+        if (type === "expense") {
+          totalExpense += amount;
+          if (date < startOfCurrentMonth) prevTotalExpense += amount;
+        }
+
+        // --- Debt Asset / Liability (Net Worth Calculation) ---
+        if (type === "debt_given") {
+          // Asset: You lent money. Current Value = (Original - PaidBack)
+          // We calculate the UNSETTLED amount.
+          const payments = paymentsMap.get(item.id);
+          const totalPaid = payments?.total || 0;
+          const currentRemaining = Math.max(0, amount - totalPaid);
+
+          if (!item.is_settled) {
+            netDebtAsset += currentRemaining;
+          }
+
+          // Historical Calculation for Prev Balance (Start of Month)
+          if (date < startOfCurrentMonth) {
+            // If debt created before this month, how much was remaining AT START of month?
+            const paymentsBeforeMonth = payments?.history
+              .filter(p => p.date < startOfCurrentMonth)
+              .reduce((sum, p) => sum + p.amount, 0) || 0;
+
+            // Check if it was settled before the month started? 
+            // Ideally we check if paymentsBeforeMonth >= amount. 
+            // But simpler: just take remaining amount at that time.
+            const remainingAtStart = Math.max(0, amount - paymentsBeforeMonth);
+            prevDebtAsset += remainingAtStart;
+          }
+        }
+
+        if (type === "debt_taken") {
+          // Liability: You borrowed money.
+          const payments = paymentsMap.get(item.id);
+          const totalPaid = payments?.total || 0;
+          const currentRemaining = Math.max(0, amount - totalPaid);
+
+          if (!item.is_settled) {
+            netDebtLiability += currentRemaining;
+          }
+
+          // Historical Calculation
+          if (date < startOfCurrentMonth) {
+            const paymentsBeforeMonth = payments?.history
+              .filter(p => p.date < startOfCurrentMonth)
+              .reduce((sum, p) => sum + p.amount, 0) || 0;
+
+            const remainingAtStart = Math.max(0, amount - paymentsBeforeMonth);
+            prevDebtLiability += remainingAtStart;
+          }
+        }
+
 
 
         // Monthly stats check (Current Month)
@@ -174,8 +251,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         }
       });
 
-      const balance = totalIncome - totalExpense;
-      const prevBalance = prevBalanceIncome - prevBalanceExpense;
+      // Net Worth Calculation
+      // Net Worth = (Total Income - Total Expenses) + (Assets [Debt Given] - Liabilities [Debt Taken])
+      const netWorth = (totalIncome - totalExpense) + netDebtAsset - netDebtLiability;
+
+      const prevNetWorth = (prevTotalIncome - prevTotalExpense) + prevDebtAsset - prevDebtLiability;
+
+      const balance = netWorth;
+      const prevBalance = prevNetWorth;
       const balanceChange = prevBalance !== 0
         ? ((balance - prevBalance) / Math.abs(prevBalance)) * 100
         : 0;

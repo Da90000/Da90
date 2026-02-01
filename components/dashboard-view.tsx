@@ -337,7 +337,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm border border-white/30 text-white text-[10px] sm:text-xs font-bold rounded-full">
-                    TOTAL BALANCE
+                    NET WORTH
                   </span>
                   <button
                     onClick={togglePrivacy}
