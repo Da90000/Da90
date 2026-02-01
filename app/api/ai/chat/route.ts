@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchContextData } from '@/lib/ai-service';
 import { createClient } from '@supabase/supabase-js';
 
 // Initialize Supabase Admin client with Service Role Key to bypass RLS
@@ -19,31 +18,40 @@ const getSupabaseAdmin = () => {
     });
 };
 
-/**
- * Simple deobfuscation for API key.
- */
-function deobfuscateKey(key: string): string {
-    if (!key) return "";
-    try {
-        return Buffer.from(key, 'base64').toString('utf-8');
-    } catch (e) {
-        return key;
-    }
-}
-
 export async function POST(request: Request) {
     try {
         const { query, userId } = await request.json();
         console.log("DEBUG: Received query:", query, "from user:", userId);
 
-        // TEMPORARY: Return a hardcoded success message immediately.
+        if (!userId) {
+            return new Response(JSON.stringify({ error: "User ID is required" }), { status: 400 });
+        }
+
+        // Initialize Supabase Client
+        const supabase = getSupabaseAdmin();
+
+        // Securely fetch all ledger data for the user
+        // Note: We use the admin client to bypass possible RLS issues for this debug step, 
+        // but we EXPLICITLY filter by user_id to ensure data safety.
+        const { data: ledgerData, error: dbError } = await supabase
+            .from("ledger")
+            .select("*")
+            .eq("user_id", userId);
+
+        if (dbError) {
+            console.error("SUPABASE FETCH FAILED:", dbError);
+            return new Response(JSON.stringify({ error: "DB Fetch Error: Check RLS policy or Table Permissions.", details: dbError }), { status: 500 });
+        }
+
+        // Test Return: Return the fetched data immediately.
         return new Response(JSON.stringify({
-            text: "AI is currently in DEBUG mode. Query received successfully.",
-            debugStatus: "SUCCESS - RAG Bypassed"
+            text: "Data Fetch Successful. Ready for AI.",
+            debug_data: ledgerData,
+            count: ledgerData?.length || 0
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
 
     } catch (error) {
-        console.error("DEBUG CRITICAL CATCH: API failed before RAG:", error);
-        return new Response(JSON.stringify({ error: "API Route Crashed before RAG." }), { status: 500 });
+        console.error("DEBUG CRITICAL CATCH: API failed during DB Fetch:", error);
+        return new Response(JSON.stringify({ error: "API Route Crashed during DB Fetch.", details: String(error) }), { status: 500 });
     }
 }

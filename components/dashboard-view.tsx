@@ -219,14 +219,14 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
 
   const statCards = [
     {
-      label: "Total Income",
+      label: "Income",
       value: formatPrice(stats.monthlyIncome),
       change: stats.incomeChange === 0 ? null : `${stats.incomeChange > 0 ? "+" : ""}${stats.incomeChange}%`,
       changeColor: stats.incomeChange > 0 ? "text-emerald-500" : "text-red-500",
       icon: TrendingUp,
     },
     {
-      label: "Total Expenses",
+      label: "Expenses",
       value: formatPrice(stats.monthlyExpense),
       change: stats.expenseChange === 0 ? null : `${stats.expenseChange > 0 ? "+" : ""}${stats.expenseChange}%`,
       changeColor: stats.expenseChange > 0 ? "text-red-500" : "text-emerald-500", // Red if expenses increased
@@ -337,7 +337,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <span className="inline-block px-3 py-1 bg-white/20 backdrop-blur-sm border border-white/30 text-white text-[10px] sm:text-xs font-bold rounded-full">
-                    NET WORTH
+                    CASH BALANCE
                   </span>
                   <button
                     onClick={togglePrivacy}
@@ -362,6 +362,12 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                       {isBalanceHidden ? "***" : `${stats.balanceChange > 0 ? "+" : ""}${stats.balanceChange.toFixed(1)}%`}
                     </span>
                   )}
+                </div>
+
+                {/* Net Debt Position Indicator */}
+                <div className={`text-xs sm:text-sm font-medium flex items-center gap-2 mb-2 ${stats.netDebtPosition > 0 ? "text-emerald-100" : stats.netDebtPosition < 0 ? "text-red-200" : "text-white/60"}`}>
+                  <CreditCard className="w-3 h-3 sm:w-4 sm:h-4" />
+                  <span>Net Debt Position: {isBalanceHidden ? "****" : formatPrice(stats.netDebtPosition)}</span>
                 </div>
 
                 <p className="text-emerald-100 text-xs sm:text-sm font-medium flex items-center gap-2">

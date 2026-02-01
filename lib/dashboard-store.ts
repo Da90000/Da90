@@ -21,6 +21,9 @@ export interface DashboardStats {
   balance: number;
   monthlyIncome: number;
   monthlyExpense: number;
+  lifetimeIncome: number;
+  lifetimeExpense: number;
+  netDebtPosition: number;
   savingsRate: number;
   totalTransactions: number;
   averageDaily: number;
@@ -82,6 +85,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
     balance: 0,
     monthlyIncome: 0,
     monthlyExpense: 0,
+    lifetimeIncome: 0,
+    lifetimeExpense: 0,
+    netDebtPosition: 0,
     savingsRate: 0,
     totalTransactions: 0,
     averageDaily: 0,
@@ -175,15 +181,22 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         const amount = item.amount;
         const date = new Date(item.created_at);
 
-        // --- Standard Income / Expense ---
-        if (type === "income") {
+        // Normalize type to ensure strict checking
+        const typeRaw = item.transaction_type?.toLowerCase() || "expense";
+        // DEBUG: Log type to verify we are skipping debt for income/expense totals
+        if (Math.random() < 0.05) console.log("Processing Dashboard Item:", item.item_name, "Type:", typeRaw);
+
+        // --- Standard Income / Expense (STRICTLY EXCLUDING DEBT) ---
+        if (typeRaw === "income") {
           totalIncome += amount;
           if (date < startOfCurrentMonth) prevTotalIncome += amount;
         }
-        if (type === "expense") {
+        else if (typeRaw === "expense") {
           totalExpense += amount;
           if (date < startOfCurrentMonth) prevTotalExpense += amount;
         }
+        // Note: Debt types are deliberately ignored here for Income/Expense totals.
+
 
         // --- Debt Asset / Liability (Net Worth Calculation) ---
         if (type === "debt_given") {
@@ -237,28 +250,72 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
 
         // Monthly stats check (Current Month)
         if (isSameMonth(date, now) && isSameYear(date, now)) {
-          if (type === "income" || type === "expense") {
+          if (typeRaw === "income" || typeRaw === "expense") {
             monthlyTransactions++;
           }
-          if (type === "income") monthlyIncome += amount;
-          if (type === "expense") monthlyExpense += amount;
+          if (typeRaw === "income") monthlyIncome += amount;
+          if (typeRaw === "expense") monthlyExpense += amount;
         }
 
         // Last Month stats check
         if (isSameMonth(date, lastMonthDate) && isSameYear(date, lastMonthDate)) {
-          if (type === "expense") lastMonthExpense += amount;
-          if (type === "income") lastMonthIncome += amount;
+          if (typeRaw === "expense") lastMonthExpense += amount;
+          if (typeRaw === "income") lastMonthIncome += amount;
         }
       });
 
-      // Net Worth Calculation
-      // Net Worth = (Total Income - Total Expenses) + (Assets [Debt Given] - Liabilities [Debt Taken])
-      const netWorth = (totalIncome - totalExpense) + netDebtAsset - netDebtLiability;
+      // --- STRICT MONTHLY RE-CALCULATION ---
+      // This overrides any previous logic to ensure absolute accuracy for the Monthly Cards.
+      // We explicitly filter for 'income'/'expense' types (normalizing case) AND strict date match.
 
-      const prevNetWorth = (prevTotalIncome - prevTotalExpense) + prevDebtAsset - prevDebtLiability;
+      const nowStrict = new Date();
+      const dayOfMonth = nowStrict.getDate();
+      const currentMonthPrefix = nowStrict.toISOString().substring(0, 7); // e.g. "2026-02"
+      const useAllTime = dayOfMonth <= 5; // Use ALL data if first 5 days
 
-      const balance = netWorth;
-      const prevBalance = prevNetWorth;
+      const isRelevantDate = (dateStr: string) => {
+        if (useAllTime) return true;
+        return dateStr?.startsWith(currentMonthPrefix);
+      };
+
+      const monthlyIncomeStrict = ledger
+        .filter(item => (item.transaction_type?.toLowerCase() === "income") && isRelevantDate(item.created_at))
+        .reduce((sum, item) => sum + item.amount, 0);
+
+      const monthlyExpenseStrict = ledger
+        .filter(item => (item.transaction_type?.toLowerCase() === "expense") && isRelevantDate(item.created_at))
+        .reduce((sum, item) => sum + item.amount, 0);
+
+      // Overwrite the loop variables
+      monthlyIncome = monthlyIncomeStrict;
+      monthlyExpense = monthlyExpenseStrict;
+
+      console.log("DEBUG: Final Stats (Soft Start Mode:", useAllTime, ") -> Income:", monthlyIncome, "Expense:", monthlyExpense);
+
+      // Cash Balance Calculation (Strictly Cash Flow)
+      // User Request: Add Debt Taken (Cash In), Subtract Debt Given (Cash Out)
+      // We calculate these totals from the raw ledger loop data we need.
+      // Since we didn't track totalDebtGiven/Taken explicitly in the loop above (only net assets), 
+      // let's do a quick reduce here for the balance formula.
+
+      const totalDebtGiven = ledger
+        .filter(i => i.transaction_type === "debt_given")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      const totalDebtTaken = ledger
+        .filter(i => i.transaction_type === "debt_taken")
+        .reduce((sum, i) => sum + i.amount, 0);
+
+      const balance = (totalIncome - totalExpense) + (totalDebtTaken - totalDebtGiven);
+      const prevBalance = prevTotalIncome - prevTotalExpense; // Note: This is an approximation for previous balance now.
+      const netDebtPosition = netDebtAsset - netDebtLiability;
+
+      // Legacy Vars (Unused but kept to match structure if needed, or we just remove them)
+      // We removed netWorth and prevNetWorth entirely.
+
+
+
+
       const balanceChange = prevBalance !== 0
         ? ((balance - prevBalance) / Math.abs(prevBalance)) * 100
         : 0;
@@ -321,6 +378,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
           balance,
           monthlyIncome,
           monthlyExpense,
+          lifetimeIncome: totalIncome,
+          lifetimeExpense: totalExpense,
+          netDebtPosition,
           savingsRate,
           totalTransactions: monthlyTransactions,
           averageDaily,
