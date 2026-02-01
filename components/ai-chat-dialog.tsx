@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { processUserQuery } from "@/lib/ai-service";
+import ReactMarkdown from "react-markdown";
 import { Send, Sparkles, User, Bot, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,7 +145,20 @@ export function AiChatDialog({ open, onOpenChange }: AiChatDialogProps) {
                                             : "bg-card border border-border text-foreground rounded-tl-sm"
                                             }`}
                                     >
-                                        {message.content}
+                                        <ReactMarkdown
+                                            components={{
+                                                ul: ({ node, ...props }: any) => <ul className="list-disc pl-4 space-y-1 my-2" {...props} />,
+                                                ol: ({ node, ...props }: any) => <ol className="list-decimal pl-4 space-y-1 my-2" {...props} />,
+                                                li: ({ node, ...props }: any) => <li className="mb-1" {...props} />,
+                                                p: ({ node, ...props }: any) => <p className="mb-2 last:mb-0 leading-relaxed" {...props} />,
+                                                strong: ({ node, ...props }: any) => <span className="font-bold" {...props} />,
+                                                h1: ({ node, ...props }: any) => <h3 className="text-lg font-bold mb-2" {...props} />,
+                                                h2: ({ node, ...props }: any) => <h4 className="text-base font-bold mb-2" {...props} />,
+                                                h3: ({ node, ...props }: any) => <h5 className="text-sm font-bold mb-1" {...props} />,
+                                            }}
+                                        >
+                                            {message.content}
+                                        </ReactMarkdown>
                                     </div>
                                 </div>
                             ))}

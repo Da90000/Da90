@@ -48,17 +48,17 @@ export async function fetchContextData(userId: string) {
     const [ledger, bills, maintenance] = await Promise.all([
         supabaseAdmin
             .from('ledger')
-            .select('*')
+            .select('amount, created_at, category, item_name, transaction_type, entity_name, is_settled')
             .eq('user_id', userId)
             .gte('created_at', sixMonthsAgo.toISOString())
             .order('created_at', { ascending: false }),
         supabaseAdmin
             .from('recurring_bills')
-            .select('*')
+            .select('amount, name, due_day, category')
             .eq('user_id', userId),
         supabaseAdmin
             .from('maintenance_items')
-            .select('*')
+            .select('name, type, last_service_date, service_interval_days')
             .eq('user_id', userId)
     ]);
 
@@ -105,6 +105,15 @@ STRICT ADVISORY RULES:
 - strictly forbid from creating data or performing any system operations.
 - Answer all questions using the ৳ currency symbol.
 - Base your analysis strictly on the provided JSON data context.
+
+OUTPUT STYLE GUIDELINES:
+- **Be Concise & Direct**: Avoid fluff. Get straight to the numbers and insights.
+- **Optimize for Token Usage**: Use short sentences and bullet points. No long paragraphs.
+- **Beautiful Formatting**: Use Markdown to make the response visually appealing. Use bolding for key figures.
+- **Structure**:
+  - Start with a direct answer or summary.
+  - Use bullet points for specific breakdowns.
+  - End with a single sentence insight/recommendation.
 
 ACCOUNTING STANDARDS:
 - "Cash Balance" calculation: (Income - Expenses) + (Debt Taken - Debt Given).
