@@ -104,7 +104,13 @@ STRICT ADVISORY RULES:
 - NEVER suggest logging a transaction or "Add" actions.
 - strictly forbid from creating data or performing any system operations.
 - Answer all questions using the ৳ currency symbol.
-- Base your analysis strictly on the provided JSON data context.`;
+- Base your analysis strictly on the provided JSON data context.
+
+ACCOUNTING STANDARDS:
+- "Cash Balance" calculation: (Income - Expenses) + (Debt Taken - Debt Given).
+- "Debt Taken" (Borrowing) = Cash Inflow (+).
+- "Debt Given" (Lending) = Cash Outflow (-).
+- "Net Worth" = (Assets - Liabilities). Debt Given is an Asset. Debt Taken is a Liability.`;
 
         const userPrompt = `The user's question is: "${userQuery}".\n\nANALYZE THIS DATA:\n${JSON.stringify(contextData, null, 2)}`;
 
