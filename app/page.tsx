@@ -58,22 +58,15 @@ export default function ShopListApp() {
           return;
         }
 
-        // Handle case where redirect lands on home with code but session isn't set yet
+        // Detect code in URL
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code');
 
         if (code) {
-          console.log("Detecting auth code, attempting exchange...");
-          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (error) {
-            console.error("Code exchange failed:", error.message);
-            router.push("/login");
-          } else if (data.session) {
-            console.log("Code exchange successful, logging in...");
-            window.history.replaceState({}, '', window.location.pathname);
-            setIsCheckingAuth(false);
-            return;
-          }
+          console.log("Detecting auth code, redirecting to callback for server-side exchange...");
+          const next = params.get('next') || '/';
+          router.push(`/auth/callback?code=${code}&next=${next}`);
+          return;
         } else {
           // No session and no code, redirect to login
           router.push("/login");
