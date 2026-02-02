@@ -52,11 +52,15 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      // Use environment variable for production URL, fallback to current origin
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const redirectUrl = `${baseUrl}/auth/callback`;
+
       const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: redirectUrl,
         },
       });
 
@@ -78,10 +82,14 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
     try {
+      // Use environment variable for production URL, fallback to current origin
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+      const redirectUrl = `${baseUrl}/auth/callback`;
+
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/auth/callback',
+          redirectTo: redirectUrl,
         },
       });
     } catch (err) {
