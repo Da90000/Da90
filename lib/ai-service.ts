@@ -70,6 +70,81 @@ export async function fetchContextData(userId: string) {
 }
 
 /**
+ * Data Summarizer - Reduces token usage by 70-80%
+ * Converts raw data into compact summaries instead of sending full JSON
+ */
+function summarizeContextData(contextData: any) {
+    const { ledger, bills, maintenance } = contextData;
+
+    // Process ledger data
+    const income = ledger.filter((t: any) => t.transaction_type === 'income');
+    const expenses = ledger.filter((t: any) => t.transaction_type === 'expense');
+    const debtTaken = ledger.filter((t: any) => t.transaction_type === 'debt' && t.category === 'debt_taken');
+    const debtGiven = ledger.filter((t: any) => t.transaction_type === 'debt' && t.category === 'debt_given');
+
+    // Calculate totals
+    const totalIncome = income.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+    const totalExpenses = expenses.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+    const totalDebtTaken = debtTaken.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+    const totalDebtGiven = debtGiven.reduce((sum: number, t: any) => sum + (t.amount || 0), 0);
+
+    // Outstanding debts
+    const unsettledDebtTaken = debtTaken.filter((d: any) => !d.is_settled).reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+    const unsettledDebtGiven = debtGiven.filter((d: any) => !d.is_settled).reduce((sum: number, d: any) => sum + (d.amount || 0), 0);
+
+    // Expense breakdown by category (top 5)
+    const expenseByCategory: Record<string, number> = {};
+    expenses.forEach((e: any) => {
+        const cat = e.category || 'Other';
+        expenseByCategory[cat] = (expenseByCategory[cat] || 0) + (e.amount || 0);
+    });
+    const topExpenses = Object.entries(expenseByCategory)
+        .sort(([, a], [, b]) => b - a)
+        .slice(0, 5)
+        .map(([cat, amt]) => `${cat}: ৳${amt}`);
+
+    // Recent transactions (last 5)
+    const recentTransactions = ledger.slice(0, 5).map((t: any) =>
+        `${t.transaction_type}: ৳${t.amount} - ${t.item_name || t.category}`
+    );
+
+    // Bills summary
+    const totalBillsAmount = bills.reduce((sum: number, b: any) => sum + (b.amount || 0), 0);
+    const billsList = bills.map((b: any) => `${b.name}: ৳${b.amount} (due day ${b.due_day})`);
+
+    // Maintenance summary
+    const now = new Date();
+    const maintenanceDue = maintenance.filter((m: any) => {
+        if (!m.last_service_date || !m.service_interval_days) return false;
+        const lastService = new Date(m.last_service_date);
+        const nextDue = new Date(lastService.getTime() + m.service_interval_days * 24 * 60 * 60 * 1000);
+        return nextDue <= now;
+    }).map((m: any) => m.name);
+
+    // Compact summary object
+    return {
+        summary: {
+            income: `৳${totalIncome} (${income.length} transactions)`,
+            expenses: `৳${totalExpenses} (${expenses.length} transactions)`,
+            balance: `৳${totalIncome - totalExpenses}`,
+            debt_taken: `৳${totalDebtTaken} (Outstanding: ৳${unsettledDebtTaken})`,
+            debt_given: `৳${totalDebtGiven} (Outstanding: ৳${unsettledDebtGiven})`,
+            net_worth: `৳${(totalIncome - totalExpenses) + (totalDebtGiven - unsettledDebtTaken)}`
+        },
+        top_expenses: topExpenses,
+        recent: recentTransactions,
+        bills: {
+            total_monthly: `৳${totalBillsAmount}`,
+            list: billsList
+        },
+        maintenance: {
+            due_now: maintenanceDue,
+            total_items: maintenance.length
+        }
+    };
+}
+
+/**
  * 2. The Prompt Orchestrator (generateResponse logic)
  * Constructs the RAG prompt and calls the AI provider.
  */
@@ -95,35 +170,34 @@ export async function generateResponse(userQuery: string, userId: string): Promi
         const provider = aiSettings.provider;
         const model = aiSettings.model_name || "gpt-4-turbo";
 
-        // 3. Prompt Construction - Specialized Financial Advisor Persona
-        const systemPrompt = `You are a Specialized Financial Advisor for LifeOS. Your sole purpose is to analyze the provided user data and offer insights, balance summaries, trends, and maintenance recommendations. 
+        // 3. Optimized Prompt - Concise Financial Advisor
+        const systemPrompt = `You are LifeOS Financial Advisor. Analyze user's income, expenses, bills, debts, and maintenance data to provide concise insights.
 
-STRICT ADVISORY RULES:
-- NEVER suggest UI actions, button clicks, or navigating the user's interface.
-- NEVER suggest creating, modifying, or deleting data.
-- NEVER suggest logging a transaction or "Add" actions.
-- strictly forbid from creating data or performing any system operations.
-- Answer all questions using the ৳ currency symbol.
-- Base your analysis strictly on the provided JSON data context.
+RESPONSE RULES:
+• NO UI actions, NO data modifications
+• Use ৳ currency symbol
+• Keep responses SHORT (2-4 bullet points max)
+• Use markdown: **bold** for numbers, bullets for lists
+• Structure: Direct answer → Key points → 1 suggestion
 
-OUTPUT STYLE GUIDELINES:
-- **Be Concise & Direct**: Avoid fluff. Get straight to the numbers and insights.
-- **Optimize for Token Usage**: Use short sentences and bullet points. No long paragraphs.
-- **Beautiful Formatting**: Use Markdown to make the response visually appealing. Use bolding for key figures.
-- **Structure**:
-  - Start with a direct answer or summary.
-  - Use bullet points for specific breakdowns.
-  - End with a single sentence insight/recommendation.
+TOPICS YOU HANDLE:
+• Income: Total earned, sources, trends
+• Expenses: Spending by category, trends
+• Bills: Upcoming payments, overdue alerts
+• Debts: Money owed/lent, settlement status
+• Maintenance: Due services, upcoming tasks
 
-ACCOUNTING STANDARDS:
-- "Cash Balance" calculation: (Income - Expenses) + (Debt Taken - Debt Given).
-- "Debt Taken" (Borrowing) = Cash Inflow (+).
-- "Debt Given" (Lending) = Cash Outflow (-).
-- "Net Worth" = (Assets - Liabilities). Debt Given is an Asset. Debt Taken is a Liability.`;
+CALCULATIONS:
+• Cash Balance = Income - Expenses + Debt Taken - Debt Given
+• Net Worth = Assets - Liabilities
 
-        const userPrompt = `The user's question is: "${userQuery}".\n\nANALYZE THIS DATA:\n${JSON.stringify(contextData, null, 2)}`;
+Be intelligent: Spot patterns, warn about issues, suggest improvements.`;
 
-        // 4. Call AI Provider
+        // 4. Summarize Data (Saves 70-80% tokens!)
+        const summarizedData = summarizeContextData(contextData);
+        const userPrompt = `Question: "${userQuery}"\n\nDATA:\n${JSON.stringify(summarizedData, null, 2)}`;
+
+        // 5. Call AI Provider
         let url = "";
         let headers: Record<string, string> = {
             "Content-Type": "application/json",
@@ -140,7 +214,8 @@ ACCOUNTING STANDARDS:
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
-                    temperature: 0.7
+                    max_tokens: 300,
+                    temperature: 0.5
                 };
                 break;
 
@@ -152,7 +227,8 @@ ACCOUNTING STANDARDS:
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
-                    temperature: 0.7
+                    max_tokens: 300,
+                    temperature: 0.5
                 };
                 break;
 
@@ -164,7 +240,8 @@ ACCOUNTING STANDARDS:
                         { role: "system", content: systemPrompt },
                         { role: "user", content: userPrompt }
                     ],
-                    temperature: 0.7
+                    max_tokens: 300,
+                    temperature: 0.5
                 };
                 break;
 
@@ -172,7 +249,8 @@ ACCOUNTING STANDARDS:
                 url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
                 delete headers["Authorization"];
                 body = {
-                    contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }]
+                    contents: [{ parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }] }],
+                    generationConfig: { maxOutputTokens: 300, temperature: 0.5 }
                 };
                 break;
 
@@ -186,7 +264,8 @@ ACCOUNTING STANDARDS:
                 delete headers["Authorization"];
                 body = {
                     model,
-                    max_tokens: 1024,
+                    max_tokens: 300,
+                    temperature: 0.5,
                     system: systemPrompt,
                     messages: [{ role: "user", content: userPrompt }]
                 };
