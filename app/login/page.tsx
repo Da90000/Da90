@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { PasswordStrengthMeter, calculatePasswordStrength } from "@/components/ui/password-strength";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -17,6 +18,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [isSignUp, setIsSignUp] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
 
   const supabase = createClient();
 
@@ -52,6 +54,14 @@ export default function LoginPage() {
     setError(null);
 
     try {
+      // Validate password strength
+      const strength = calculatePasswordStrength(password);
+      if (strength.score < 3) {
+        setError("Please create a stronger password. It should be at least 8 characters and include uppercase, lowercase, and numbers.");
+        setIsLoading(false);
+        return;
+      }
+
       // Use environment variable for production URL, fallback to current origin
       const baseUrl = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       const redirectUrl = `${baseUrl}/auth/callback`;
@@ -135,7 +145,7 @@ export default function LoginPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
-                className="h-11 focus:ring-emerald-500 border-gray-200"
+                className="h-11 focus:ring-emerald-500 border-gray-200 bg-white"
               />
             </div>
 
@@ -150,8 +160,8 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={isLoading}
-                  className="h-11 focus:ring-emerald-500 border-gray-200 pr-10"
-                  minLength={6}
+                  className="h-11 focus:ring-emerald-500 border-gray-200 bg-white pr-10"
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -166,8 +176,42 @@ export default function LoginPage() {
                   )}
                 </button>
               </div>
+
+              {/* Show password strength only during signup */}
+              {isSignUp && <PasswordStrengthMeter password={password} showRequirements={true} />}
             </div>
           </div>
+
+          {/* Remember Me - Show only during sign in */}
+          {!isSignUp && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="remember"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                />
+                <label
+                  htmlFor="remember"
+                  className="text-sm text-gray-600 cursor-pointer select-none"
+                >
+                  Remember me
+                </label>
+              </div>
+              <a
+                href="#"
+                className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                onClick={(e) => {
+                  e.preventDefault();
+                  alert("Password reset feature - Coming soon!");
+                }}
+              >
+                Forgot password?
+              </a>
+            </div>
+          )}
 
           <div className="space-y-3 pt-2">
             <Button
