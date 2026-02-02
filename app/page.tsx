@@ -48,11 +48,31 @@ export default function ShopListApp() {
     const checkAuth = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        if (!session) {
-          router.push("/login");
+
+        if (session) {
+          // Use replaceState to clear the URL query params without refreshing
+          const params = new URLSearchParams(window.location.search);
+          if (params.has('code')) {
+            window.history.replaceState({}, '', '/');
+          }
+          setIsCheckingAuth(false);
           return;
         }
-        setIsCheckingAuth(false);
+
+        // Handle case where redirect lands on home with code but session isn't set yet
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get('code');
+
+        if (code) {
+          const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+          if (!error && data.session) {
+            window.history.replaceState({}, '', '/');
+            setIsCheckingAuth(false);
+            return;
+          }
+        }
+
+        router.push("/login");
       } catch (error) {
         console.error("Failed to check auth:", error);
         router.push("/login");
