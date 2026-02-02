@@ -50,10 +50,9 @@ export default function ShopListApp() {
         const { data: { session } } = await supabase.auth.getSession();
 
         if (session) {
-          // Use replaceState to clear the URL query params without refreshing
-          const params = new URLSearchParams(window.location.search);
-          if (params.has('code')) {
-            window.history.replaceState({}, '', '/');
+          // If we have a session but there's a code in the URL, clean it up
+          if (window.location.search.includes('code=')) {
+            window.history.replaceState({}, '', window.location.pathname);
           }
           setIsCheckingAuth(false);
           return;
@@ -64,15 +63,21 @@ export default function ShopListApp() {
         const code = params.get('code');
 
         if (code) {
+          console.log("Detecting auth code, attempting exchange...");
           const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-          if (!error && data.session) {
-            window.history.replaceState({}, '', '/');
+          if (error) {
+            console.error("Code exchange failed:", error.message);
+            router.push("/login");
+          } else if (data.session) {
+            console.log("Code exchange successful, logging in...");
+            window.history.replaceState({}, '', window.location.pathname);
             setIsCheckingAuth(false);
             return;
           }
+        } else {
+          // No session and no code, redirect to login
+          router.push("/login");
         }
-
-        router.push("/login");
       } catch (error) {
         console.error("Failed to check auth:", error);
         router.push("/login");
@@ -80,7 +85,7 @@ export default function ShopListApp() {
     };
 
     checkAuth();
-  }, [router, supabase.auth]);
+  }, [router, supabase]);
 
   // Load data from database on mount (only after auth is confirmed)
   useEffect(() => {

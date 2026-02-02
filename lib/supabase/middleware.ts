@@ -45,8 +45,12 @@ export async function updateSession(request: NextRequest) {
   const protectedRoutes = ['/', '/inventory', '/market', '/expenses', '/analytics', '/maintenance', '/bills']
   const isProtectedRoute = protectedRoutes.some(route => pathname === route || pathname.startsWith(route + '/'))
 
+  const hasCode = request.nextUrl.searchParams.has('code')
+
   // If user is not signed in and trying to access a protected route, redirect to login
-  if (!user && isProtectedRoute) {
+  // We allow the request to proceed if there is a 'code' parameter, as this is likely an OAuth redirect
+  // being handled by code in app/page.tsx or the callback route.
+  if (!user && isProtectedRoute && !hasCode) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
