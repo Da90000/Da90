@@ -58,6 +58,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { addTransaction } from "@/lib/ledger-store";
 import { CATEGORIES } from "@/lib/types";
+import { UnifiedTransactionDialog, type TransactionData } from "@/components/unified-transaction-dialog";
 
 interface DashboardViewProps {
   onNavigate: (mode: ViewMode) => void;
@@ -103,11 +104,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
   } = useDashboardStore();
 
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
-  const [transactionType, setTransactionType] = useState<"income" | "expense">("expense");
-  const [itemName, setItemName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("");
-  const [date, setDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [transactionType, setTransactionType] = useState<"income" | "expense" | "debt">("expense");
   const router = useRouter();
   const supabase = createClient();
   const { theme, setTheme } = useTheme();
@@ -143,10 +140,6 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
 
   const handleOpenTransaction = (type: "income" | "expense") => {
     setTransactionType(type);
-    setItemName("");
-    setAmount("");
-    setCategory("");
-    setDate(format(new Date(), "yyyy-MM-dd"));
     setIsTransactionOpen(true);
   };
 
@@ -182,21 +175,24 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     // Helper to refresh data if needed, but fetchDashboardData covers it.
   };
 
-  const handleTransactionSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!itemName || !amount || !category) return;
+  const handleUnifiedTransactionSubmit = async (data: TransactionData) => {
+    try {
+      const transactionData = {
+        item_name: data.type.startsWith("debt_")
+          ? (data.debtType === "debt_given" ? `Given to ${data.entityName}` : `Borrowed from ${data.entityName}`)
+          : data.itemName,
+        amount: data.amount,
+        category: data.category,
+        transaction_type: data.type,
+        entity_name: data.entityName || undefined,
+        created_at: data.date ? new Date(data.date + "T23:59:59").toISOString() : new Date().toISOString(),
+      };
 
-    const transactionData = {
-      item_name: itemName,
-      amount: parseFloat(amount),
-      category: category,
-      transaction_type: transactionType,
-      created_at: new Date(date).toISOString(),
-    };
-
-    await addTransaction(transactionData);
-    await fetchDashboardData();
-    setIsTransactionOpen(false);
+      await addTransaction(transactionData);
+      await fetchDashboardData();
+    } catch (error) {
+      console.error("Failed to add transaction:", error);
+    }
   };
 
   useEffect(() => {
@@ -706,81 +702,13 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
         </div>
       </main>
 
-      {/* Quick Transaction Dialog */}
-      <Dialog open={isTransactionOpen} onOpenChange={setIsTransactionOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>{transactionType === "income" ? "Add Income" : "Add Expense"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleTransactionSubmit} className="space-y-4 pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Description</Label>
-              <Input
-                id="name"
-                placeholder={transactionType === "income" ? "Salary, Bonus, etc." : "Groceries, Rent, etc."}
-                value={itemName}
-                onChange={(e) => setItemName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="amount">Amount</Label>
-              <Input
-                id="amount"
-                type="number"
-                step="0.01"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select value={category} onValueChange={setCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {CATEGORIES.map((cat) => (
-                    <SelectItem key={cat} value={cat}>
-                      {cat}
-                    </SelectItem>
-                  ))}
-                  <SelectItem value="Salary">Salary</SelectItem>
-                  <SelectItem value="Business">Business</SelectItem>
-                  <SelectItem value="Investment">Investment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input
-                id="date"
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                required
-              />
-            </div>
-
-            <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsTransactionOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                className={transactionType === "income" ? "bg-emerald-600 hover:bg-emerald-700" : "bg-red-600 hover:bg-red-700"}
-              >
-                Add {transactionType === "income" ? "Income" : "Expense"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* Unified Transaction Dialog (NEW UX) */}
+      <UnifiedTransactionDialog
+        isOpen={isTransactionOpen}
+        onClose={() => setIsTransactionOpen(false)}
+        onSubmit={handleUnifiedTransactionSubmit}
+        initialType={transactionType}
+      />
     </div>
   );
 }

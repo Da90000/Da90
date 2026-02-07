@@ -53,6 +53,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FloatingActionBtn } from "@/components/ui/fab";
 import { Badge } from "@/components/ui/badge";
 import { TransactionCard } from "@/components/ui/transaction-card";
+import { UnifiedTransactionDialog, type TransactionData } from "@/components/unified-transaction-dialog";
 
 function formatDate(iso: string): string {
   try {
@@ -71,6 +72,10 @@ export function LedgerHistory() {
   const [view, setView] = useState<ViewType>("expenses");
   const [allLedgerItems, setAllLedgerItems] = useState<LedgerEntry[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Unified Transaction Dialog (NEW)
+  const [unifiedDialogOpen, setUnifiedDialogOpen] = useState(false);
+  const [unifiedDialogType, setUnifiedDialogType] = useState<"expense" | "income" | "debt">("expense");
 
   // Add Income Dialog
   const [incomeOpen, setIncomeOpen] = useState(false);
@@ -405,11 +410,47 @@ export function LedgerHistory() {
   // Helper function to handle FAB click based on current view
   const handleFabClick = () => {
     if (view === "expenses") {
-      setExpenseOpen(true);
+      setUnifiedDialogType("expense");
+      setUnifiedDialogOpen(true);
     } else if (view === "income") {
-      setIncomeOpen(true);
+      setUnifiedDialogType("income");
+      setUnifiedDialogOpen(true);
     } else if (view === "debt") {
-      setDebtOpen(true);
+      setUnifiedDialogType("debt");
+      setUnifiedDialogOpen(true);
+    }
+  };
+
+  // Handle unified dialog submission
+  const handleUnifiedDialogSubmit = async (data: TransactionData) => {
+    try {
+      const { success, error } = await addTransaction({
+        item_name: data.type.startsWith("debt_")
+          ? (data.debtType === "debt_given" ? `Given to ${data.entityName}` : `Borrowed from ${data.entityName}`)
+          : data.itemName,
+        category: data.category,
+        amount: data.amount,
+        transaction_type: data.type,
+        entity_name: data.entityName || undefined,
+        created_at: data.date ? new Date(data.date + "T23:59:59").toISOString() : new Date().toISOString(),
+      });
+
+      if (success) {
+        toast({ title: `${data.type.charAt(0).toUpperCase() + data.type.slice(1)} added successfully` });
+        await loadData();
+      } else {
+        toast({
+          title: "Failed to add transaction",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : String(error),
+        variant: "destructive",
+      });
     }
   };
 
@@ -732,19 +773,19 @@ export function LedgerHistory() {
 
         {/* Add Buttons */}
         {view === "expenses" && (
-          <Button onClick={() => setExpenseOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white rounded-xl">
+          <Button onClick={() => { setUnifiedDialogType("expense"); setUnifiedDialogOpen(true); }} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto bg-rose-600 hover:bg-rose-700 text-white rounded-xl">
             <Minus className="h-5 w-5" />
             Log Expense
           </Button>
         )}
         {view === "income" && (
-          <Button onClick={() => setIncomeOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">
+          <Button onClick={() => { setUnifiedDialogType("income"); setUnifiedDialogOpen(true); }} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl">
             <Plus className="h-5 w-5" />
             Add Income
           </Button>
         )}
         {view === "debt" && (
-          <Button onClick={() => setDebtOpen(true)} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto rounded-xl">
+          <Button onClick={() => { setUnifiedDialogType("debt"); setUnifiedDialogOpen(true); }} size="lg" className="hidden gap-2 sm:flex w-full sm:w-auto rounded-xl">
             <Plus className="h-5 w-5" />
             Add Debt
           </Button>
@@ -1394,6 +1435,14 @@ export function LedgerHistory() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Unified Transaction Dialog (NEW UX) */}
+      <UnifiedTransactionDialog
+        isOpen={unifiedDialogOpen}
+        onClose={() => setUnifiedDialogOpen(false)}
+        onSubmit={handleUnifiedDialogSubmit}
+        initialType={unifiedDialogType}
+      />
 
       {/* Floating Action Button for Mobile */}
       <FloatingActionBtn onClick={handleFabClick} />

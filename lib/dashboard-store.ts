@@ -306,8 +306,54 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
         .filter(i => i.transaction_type === "debt_taken")
         .reduce((sum, i) => sum + i.amount, 0);
 
-      const balance = (totalIncome - totalExpense) + (totalDebtTaken - totalDebtGiven);
-      const prevBalance = prevTotalIncome - prevTotalExpense; // Note: This is an approximation for previous balance now.
+      // Calculate debt payments with proper direction based on debt type
+      // - Payments on debt_taken (you paying back borrowed money) → Decrease balance
+      // - Payments on debt_given (receiving repayment on money you lent) → Increase balance
+
+      // Create a map of ledger_id to transaction_type for quick lookup
+      const ledgerTypeMap = new Map<string, string>();
+      ledger.forEach(entry => {
+        if (entry.transaction_type?.startsWith("debt_")) {
+          ledgerTypeMap.set(entry.id, entry.transaction_type);
+        }
+      });
+
+      // Calculate net effect of all debt payments
+      let totalDebtTakenPayments = 0;  // Payments on debts you took (cash out)
+      let totalDebtGivenPayments = 0;  // Payments received on debts you gave (cash in)
+
+      paymentsMap.forEach((paymentInfo, ledgerId) => {
+        const debtType = ledgerTypeMap.get(ledgerId);
+        if (debtType === "debt_taken") {
+          totalDebtTakenPayments += paymentInfo.total;
+        } else if (debtType === "debt_given") {
+          totalDebtGivenPayments += paymentInfo.total;
+        }
+      });
+
+      // Balance Formula:
+      // Cash In: Income + Debt Taken (borrowed money) + Debt Given Payments (received repayments)
+      // Cash Out: Expenses + Debt Given (lent money) + Debt Taken Payments (paid back debts)
+      const balance = (totalIncome - totalExpense) + (totalDebtTaken - totalDebtGiven) + (totalDebtGivenPayments - totalDebtTakenPayments);
+
+      // Previous balance calculation with same logic for payments before the month
+      let prevDebtTakenPayments = 0;
+      let prevDebtGivenPayments = 0;
+
+      paymentsMap.forEach((paymentInfo, ledgerId) => {
+        const debtType = ledgerTypeMap.get(ledgerId);
+        const paymentsBeforeMonth = paymentInfo.history
+          .filter(p => p.date < startOfCurrentMonth)
+          .reduce((pSum, p) => pSum + p.amount, 0);
+
+        if (debtType === "debt_taken") {
+          prevDebtTakenPayments += paymentsBeforeMonth;
+        } else if (debtType === "debt_given") {
+          prevDebtGivenPayments += paymentsBeforeMonth;
+        }
+      });
+
+      const prevBalance = (prevTotalIncome - prevTotalExpense) + (totalDebtTaken - totalDebtGiven) + (prevDebtGivenPayments - prevDebtTakenPayments);
       const netDebtPosition = netDebtAsset - netDebtLiability;
 
       // Legacy Vars (Unused but kept to match structure if needed, or we just remove them)
