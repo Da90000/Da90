@@ -17,6 +17,17 @@ import { CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { TransactionType } from "@/lib/ledger-store";
 
+const INCOME_CATEGORIES = [
+    "Salary",
+    "Business",
+    "Freelance",
+    "Check In",
+    "Investment",
+    "Gift",
+    "Refund",
+    "Other",
+] as const;
+
 interface UnifiedTransactionDialogProps {
     isOpen: boolean;
     onClose: () => void;
@@ -51,6 +62,13 @@ export function UnifiedTransactionDialog({
     const [debtType, setDebtType] = useState<"debt_given" | "debt_taken">("debt_given");
     const [isSubmitting, setIsSubmitting] = useState(false);
 
+    // Reset specific fields when tab changes
+    const handleTabChange = (tab: TabType) => {
+        setActiveTab(tab);
+        setCategory("");
+        // Optional: clear other fields if desired, but user might want to keep amount/date
+    };
+
     const handleReset = () => {
         setItemName("");
         setAmount("");
@@ -74,7 +92,7 @@ export function UnifiedTransactionDialog({
                 type: activeTab === "debt" ? debtType : activeTab,
                 itemName: activeTab === "debt" ? entityName : itemName,
                 amount: parseFloat(amount),
-                category: activeTab === "income" ? "Income" : activeTab === "debt" ? "Debt" : category,
+                category: activeTab === "debt" ? "Debt" : category || (activeTab === "income" ? "Income" : "Expense"),
                 date,
             };
 
@@ -105,14 +123,8 @@ export function UnifiedTransactionDialog({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
             <div className="relative w-full max-w-md rounded-xl border border-border bg-card shadow-xl">
                 {/* Close Button */}
-                <button
-                    type="button"
-                    onClick={handleClose}
-                    className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-                >
-                    <X className="h-5 w-5" />
-                    <span className="sr-only">Close</span>
-                </button>
+                {/* Close Button Removed as per user request */
+                /* <button ... /> */}
 
                 {/* Tab Switcher */}
                 <div className="flex border-b border-border bg-muted/30 rounded-t-xl">
@@ -123,7 +135,7 @@ export function UnifiedTransactionDialog({
                             <button
                                 key={tab.id}
                                 type="button"
-                                onClick={() => setActiveTab(tab.id)}
+                                onClick={() => handleTabChange(tab.id)}
                                 className={cn(
                                     "flex-1 flex items-center justify-center gap-2 px-4 py-3.5 text-sm font-semibold transition-all relative",
                                     isActive
@@ -247,6 +259,25 @@ export function UnifiedTransactionDialog({
                                 </SelectTrigger>
                                 <SelectContent>
                                     {CATEGORIES.map((cat) => (
+                                        <SelectItem key={cat} value={cat}>
+                                            {cat}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    )}
+
+                    {/* Category (only for income) */}
+                    {activeTab === "income" && (
+                        <div className="space-y-2">
+                            <Label htmlFor="category">Category</Label>
+                            <Select value={category} onValueChange={setCategory} required>
+                                <SelectTrigger className="bg-input">
+                                    <SelectValue placeholder="Select category" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {INCOME_CATEGORIES.map((cat) => (
                                         <SelectItem key={cat} value={cat}>
                                             {cat}
                                         </SelectItem>

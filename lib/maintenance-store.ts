@@ -194,16 +194,32 @@ export async function updateMaintenanceItem(
   return true;
 }
 
-/**
- * Deletes a row from maintenance_items. Returns true on success.
- * Call fetchMaintenanceItems() after to refresh the list.
- */
+// Deletes an item and its logs
 export async function deleteMaintenanceItem(id: string): Promise<boolean> {
   if (!supabase) {
     console.warn("Supabase client not initialized. Skipping delete.");
     return false;
   }
-  const { error } = await supabase.from("maintenance_items").delete().eq("id", id);
+
+  // 1. Delete associated logs first to avoid FK constraint errors
+  const { error: logError } = await supabase
+    .from("maintenance_logs")
+    .delete()
+    .eq("item_id", id);
+
+  if (logError) {
+    console.error("Failed to delete associated maintenance logs:", logError);
+    // Proceed anyway? No, logs must go first. But if logs table doesn't exist or permissions...
+    // We'll return false to be safe.
+    return false;
+  }
+
+  // 2. Delete the item itself
+  const { error } = await supabase
+    .from("maintenance_items")
+    .delete()
+    .eq("id", id);
+
   if (error) {
     console.error("Supabase maintenance_items deleteMaintenanceItem error:", error);
     return false;

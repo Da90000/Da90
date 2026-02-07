@@ -26,7 +26,7 @@ export function InventoryItemCard({ item, onAddToCart, onDelete, onEdit, isInCar
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all"
+            className="h-8 w-8 text-muted-foreground hover:text-primary transition-all"
             onClick={() => onEdit(item)}
           >
             <Edit className="h-4 w-4" />
@@ -35,7 +35,7 @@ export function InventoryItemCard({ item, onAddToCart, onDelete, onEdit, isInCar
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive transition-all"
             onClick={() => onDelete(item.id)}
           >
             <Trash2 className="h-4 w-4" />
@@ -59,13 +59,12 @@ export function InventoryItemCard({ item, onAddToCart, onDelete, onEdit, isInCar
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">Last:</span>
               <span
-                className={`text-sm font-medium ${
-                  item.lastPaidPrice > item.basePrice
+                className={`text-sm font-medium ${item.lastPaidPrice > item.basePrice
                     ? "text-destructive" // Red for trend up
                     : item.lastPaidPrice < item.basePrice
-                    ? "text-green-600 dark:text-green-500" // Green for trend down
-                    : "text-muted-foreground" // Neutral if equal
-                }`}
+                      ? "text-green-600 dark:text-green-500" // Green for trend down
+                      : "text-muted-foreground" // Neutral if equal
+                  }`}
               >
                 {item.lastPaidPrice.toFixed(2)} BDT
               </span>

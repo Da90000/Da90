@@ -681,9 +681,9 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                         </div>
                       </div>
                     </div>
-                    <div className="text-right ml-4">
+                    <div className="text-right ml-4 flex-shrink-0">
                       <p
-                        className={`text-lg font-bold tracking-tight ${isIncome
+                        className={`text-base sm:text-lg font-bold tracking-tight break-words ${isIncome
                           ? "text-emerald-600 dark:text-emerald-400"
                           : "text-foreground"
                           }`}

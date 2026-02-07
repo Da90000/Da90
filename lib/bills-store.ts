@@ -74,7 +74,7 @@ export async function fetchBills(): Promise<BillWithDue[]> {
     const msg = e?.message ?? JSON.stringify(error);
     console.warn(
       `recurring_bills fetch error: ${msg}${e?.code ? ` [${e.code}]` : ""}. ` +
-        "If the table does not exist, run supabase/migrations/recurring_bills.sql in the Supabase SQL Editor."
+      "If the table does not exist, run supabase/migrations/recurring_bills.sql in the Supabase SQL Editor."
     );
     return [];
   }
@@ -159,22 +159,22 @@ export async function addBill(
     if (error) {
       // Improved error logging with JSON.stringify
       console.error("Supabase Error:", JSON.stringify(error, null, 2));
-      
+
       // Extract error details for user-friendly messages
       const errorMessage = error.message || (error as any)?.message || "Unknown error";
       const errorCode = error.code || (error as any)?.code || (error as any)?.statusCode || "unknown";
       const errorDetails = (error as any)?.details || null;
       const errorHint = (error as any)?.hint || null;
-      
+
       // Check if it's an RLS policy error (common codes: 42501, PGRST301, etc.)
-      const isRLSError = 
-        errorCode === "42501" || 
+      const isRLSError =
+        errorCode === "42501" ||
         errorCode === "PGRST301" ||
-        String(errorMessage)?.toLowerCase().includes("policy") || 
+        String(errorMessage)?.toLowerCase().includes("policy") ||
         String(errorMessage)?.toLowerCase().includes("permission") ||
         String(errorMessage)?.toLowerCase().includes("row-level security") ||
         String(errorMessage)?.toLowerCase().includes("new row violates");
-      
+
       if (isRLSError) {
         return {
           success: false,
@@ -185,7 +185,7 @@ export async function addBill(
           ),
         };
       }
-      
+
       // Return a user-friendly error message
       const userMessage = errorMessage || errorDetails || errorHint || "Failed to add bill. Please check your connection and try again.";
       return {
@@ -231,4 +231,91 @@ export async function logBillPayment(billName: string, amount: number): Promise<
     return false;
   }
   return true;
+}
+
+/**
+ * Updates an existing bill in the recurring_bills table.
+ * Returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function updateBill(
+  billId: string,
+  updates: Partial<Omit<RecurringBill, "id">>
+): Promise<{ success: boolean; error: unknown }> {
+  try {
+    const supabase = createClient();
+    if (!supabase) {
+      return { success: false, error: new Error("Supabase client not initialized") };
+    }
+
+    // Build the update payload, mapping to database schema
+    const updatePayload: Record<string, unknown> = {};
+
+    if (updates.name !== undefined) {
+      updatePayload.name = updates.name.trim();
+    }
+    if (updates.amount !== undefined) {
+      updatePayload.amount = Number.isFinite(updates.amount) && updates.amount >= 0 ? updates.amount : 0;
+    }
+    if (updates.day_of_month !== undefined) {
+      updatePayload.due_day = Math.max(1, Math.min(31, updates.day_of_month));
+    }
+    if (updates.category !== undefined) {
+      updatePayload.category = updates.category ? updates.category.trim() : null;
+    }
+
+    const { error } = await supabase
+      .from("recurring_bills")
+      .update(updatePayload)
+      .eq("id", billId);
+
+    if (error) {
+      console.error("updateBill error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+
+    return { success: true, error: null };
+  } catch (err) {
+    console.error("updateBill unexpected error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
+  }
+}
+
+/**
+ * Deletes a bill from the recurring_bills table.
+ * Returns { success: true, error: null } on success, or { success: false, error } on failure.
+ */
+export async function deleteBill(billId: string): Promise<{ success: boolean; error: unknown }> {
+  try {
+    const supabase = createClient();
+    if (!supabase) {
+      return { success: false, error: new Error("Supabase client not initialized") };
+    }
+
+    const { error } = await supabase
+      .from("recurring_bills")
+      .delete()
+      .eq("id", billId);
+
+    if (error) {
+      console.error("deleteBill error:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error : new Error(String(error)),
+      };
+    }
+
+    return { success: true, error: null };
+  } catch (err) {
+    console.error("deleteBill unexpected error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err : new Error(String(err)),
+    };
+  }
 }

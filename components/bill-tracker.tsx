@@ -14,10 +14,15 @@ import {
   Flame,
   Clapperboard,
   PlayCircle,
+  MoreVertical,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import {
   fetchBills,
   addBill,
+  updateBill,
+  deleteBill,
   logBillPayment,
   type BillWithDue,
 } from "@/lib/bills-store";
@@ -43,6 +48,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 function getBillIcon(name: string, category?: string) {
   const n = name.toLowerCase();
@@ -88,6 +109,20 @@ export function BillTracker() {
   const [addDay, setAddDay] = useState("");
   const [addCategory, setAddCategory] = useState("");
   const [addSaving, setAddSaving] = useState(false);
+
+  // Edit Bill Dialog State
+  const [editOpen, setEditOpen] = useState(false);
+  const [editBill, setEditBill] = useState<BillWithDue | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editAmount, setEditAmount] = useState("");
+  const [editDay, setEditDay] = useState("");
+  const [editCategory, setEditCategory] = useState("");
+  const [editSaving, setEditSaving] = useState(false);
+
+  // Delete Bill Dialog State
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [billToDelete, setBillToDelete] = useState<BillWithDue | null>(null);
+  const [deleteSaving, setDeleteSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -207,6 +242,86 @@ export function BillTracker() {
     }
   };
 
+  const handleEditClick = (bill: BillWithDue) => {
+    setEditBill(bill);
+    setEditName(bill.name);
+    setEditAmount(String(bill.amount));
+    setEditDay(String(bill.day_of_month));
+    setEditCategory(bill.category || "");
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editBill) return;
+    if (!editName.trim()) {
+      toast({ title: "Enter a bill name", variant: "destructive" });
+      return;
+    }
+    const amount = Number.parseFloat(editAmount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    const day = Number.parseInt(editDay);
+    if (!Number.isFinite(day) || day < 1 || day > 31) {
+      toast({ title: "Enter a valid day (1-31)", variant: "destructive" });
+      return;
+    }
+
+    setEditSaving(true);
+    try {
+      const { success, error } = await updateBill(editBill.id, {
+        name: editName.trim(),
+        amount,
+        day_of_month: day,
+        category: editCategory.trim() || undefined,
+      });
+
+      if (success) {
+        toast({ title: "Bill updated successfully" });
+        setEditOpen(false);
+        setEditBill(null);
+        await load();
+      } else {
+        toast({
+          title: "Failed to update bill",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteClick = (bill: BillWithDue) => {
+    setBillToDelete(bill);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!billToDelete) return;
+
+    setDeleteSaving(true);
+    try {
+      const { success, error } = await deleteBill(billToDelete.id);
+      if (success) {
+        toast({ title: "Bill deleted successfully" });
+        await load();
+        setDeleteOpen(false);
+        setBillToDelete(null);
+      } else {
+        toast({
+          title: "Failed to delete bill",
+          description: error instanceof Error ? error.message : String(error),
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setDeleteSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-6">
@@ -305,18 +420,40 @@ export function BillTracker() {
                       <span className={`text-lg font-semibold tabular-nums ${paid ? "text-muted-foreground" : "text-foreground"}`}>
                         {formatPrice(bill.amount)}
                       </span>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="shrink-0"
-                        onClick={() => handleMarkPaidClick(bill)}
-                        disabled={paid}
-                      >
-                        {paid ? (
-                          <CheckCircle2 className="mr-1.5 h-4 w-4 text-muted-foreground" />
-                        ) : null}
-                        {paid ? "Paid" : "Mark Paid"}
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="shrink-0"
+                          onClick={() => handleMarkPaidClick(bill)}
+                          disabled={paid}
+                        >
+                          {paid ? (
+                            <CheckCircle2 className="mr-1.5 h-4 w-4 text-muted-foreground" />
+                          ) : null}
+                          {paid ? "Paid" : "Mark Paid"}
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEditClick(bill)}>
+                              <Pencil className="mr-2 h-4 w-4" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() => handleDeleteClick(bill)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -473,6 +610,38 @@ export function BillTracker() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove &quot;{billToDelete?.name}&quot; permanently. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteSaving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              onClick={(e) => {
+                e.preventDefault();
+                handleDeleteConfirm();
+              }}
+              disabled={deleteSaving}
+            >
+              {deleteSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Floating Action Button for Mobile */}
       <FloatingActionBtn onClick={() => setAddOpen(true)} />
