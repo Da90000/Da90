@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { CATEGORIES } from "@/lib/types";
+import { EXPENSE_CATEGORIES } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import type { TransactionType } from "@/lib/ledger-store";
 
@@ -258,7 +258,7 @@ export function UnifiedTransactionDialog({
                                     <SelectValue placeholder="Select category" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {CATEGORIES.map((cat) => (
+                                    {EXPENSE_CATEGORIES.map((cat) => (
                                         <SelectItem key={cat} value={cat}>
                                             {cat}
                                         </SelectItem>

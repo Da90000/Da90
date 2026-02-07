@@ -373,24 +373,18 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
               </div>
 
               {/* Buttons Row - Horizontal on all screens now */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleOpenTransaction("income")}
-                  className="flex-1 bg-white/20 backdrop-blur-sm border border-white/30 text-white px-3 sm:px-5 h-10 sm:h-12 rounded-xl hover:bg-white/30 transition-all font-medium text-xs sm:text-sm flex items-center justify-center gap-2"
-                >
-                  <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4" />
-                  Add Income
-                </button>
+              <div className="flex items-center gap-2 flex-1 md:flex-none justify-end">
                 <button
                   onClick={() => handleOpenTransaction("expense")}
-                  className="flex-1 bg-white/20 backdrop-blur-sm border border-white/30 text-white px-3 sm:px-5 h-10 sm:h-12 rounded-xl hover:bg-white/30 transition-all font-medium text-xs sm:text-sm flex items-center justify-center gap-2"
+                  className="flex-1 md:flex-none bg-white/20 backdrop-blur-sm border border-white/30 text-white px-3 sm:px-6 h-10 sm:h-12 rounded-xl hover:bg-white/30 transition-all font-medium text-xs sm:text-sm flex items-center justify-center gap-2 min-w-[140px]"
                 >
-                  <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4" />
-                  Add Expense
+                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                  Add Transaction
                 </button>
                 <button
                   onClick={handleExport}
                   className="bg-card text-emerald-600 w-10 h-10 sm:w-auto sm:px-6 sm:h-12 rounded-xl hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-all font-medium flex items-center justify-center gap-2 shadow-sm"
+                  aria-label="Export Data"
                 >
                   <Download className="w-4 h-4" />
                   <span className="hidden sm:inline">Export</span>
@@ -463,34 +457,44 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                   Your spending pattern
                 </p>
               </div>
-              <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
-                <button
-                  onClick={() => setPeriod("week")}
-                  className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${period === "week"
-                    ? "bg-background text-emerald-600 shadow-sm"
-                    : "text-muted-foreground hover:bg-background/50"
-                    }`}
-                >
-                  Week
-                </button>
-                <button
-                  onClick={() => setPeriod("month")}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${period === "month"
-                    ? "bg-background text-emerald-600 shadow-sm font-bold"
-                    : "text-muted-foreground hover:bg-background/50"
-                    }`}
-                >
-                  Month
-                </button>
-                <button
-                  onClick={() => setPeriod("year")}
-                  className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${period === "year"
-                    ? "bg-background text-emerald-600 shadow-sm font-bold"
-                    : "text-muted-foreground hover:bg-background/50"
-                    }`}
-                >
-                  Year
-                </button>
+              <div className="flex items-center justify-end">
+                <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[240px]">
+                  {/* Sliding Background */}
+                  <div
+                    className="absolute inset-y-1 bg-background rounded-lg shadow-sm transition-all duration-300 ease-out"
+                    style={{
+                      width: "calc(33.33% - 4px)",
+                      left: period === "week" ? "4px" : period === "month" ? "calc(33.33% + 2px)" : "calc(66.66% + 0px)",
+                    }}
+                  />
+
+                  {/* Note: Adjusting left calc to perfectly align. 
+                      Container padding 4px (p-1). 
+                      Width approx 33%.
+                  */}
+
+                  <button
+                    onClick={() => setPeriod("week")}
+                    className={`relative z-10 flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "week" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
+                      }`}
+                  >
+                    Week
+                  </button>
+                  <button
+                    onClick={() => setPeriod("month")}
+                    className={`relative z-10 flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "month" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
+                      }`}
+                  >
+                    Month
+                  </button>
+                  <button
+                    onClick={() => setPeriod("year")}
+                    className={`relative z-10 flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "year" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
+                      }`}
+                  >
+                    Year
+                  </button>
+                </div>
               </div>
             </div>
 

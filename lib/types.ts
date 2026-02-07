@@ -40,3 +40,22 @@ export const CATEGORIES = [
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
+
+export const EXPENSE_CATEGORIES = [
+  "Bazaar (Groceries)",
+  "Transport (Rickshaw/CNG)",
+  "House Rent",
+  "Utilities (Gas/Elec/Water)",
+  "Internet & Mobile",
+  "Eating Out",
+  "Medicine & Health",
+  "Education",
+  "Shopping & Clothing",
+  "Home Maintenance",
+  "Family & Giving",
+  "Charity / Zakat",
+  "Loans / Debt",
+  "Other",
+] as const;
+
+export type ExpenseCategory = (typeof EXPENSE_CATEGORIES)[number];
