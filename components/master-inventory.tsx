@@ -1,8 +1,10 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Search, Filter } from "lucide-react";
+import { Search, Filter, UploadCloud } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { InventoryUploadDialog } from "@/components/inventory-upload-dialog";
 import { FloatingActionBtn } from "@/components/ui/fab";
 import {
   Select,
@@ -20,10 +22,11 @@ import { CATEGORIES } from "@/lib/types";
 interface MasterInventoryProps {
   inventory: InventoryItem[];
   shoppingList: ShoppingListItem[];
-  onAddItem: (item: { name: string; category: string; basePrice: number }) => void;
-  onEditItem: (id: string, updates: { name: string; category: string; basePrice: number }) => void;
+  onAddItem: (item: { name: string; category: string; basePrice: number; unit?: string }) => void;
+  onEditItem: (id: string, updates: { name: string; category: string; basePrice: number; unit?: string }) => void;
   onDeleteItem: (id: string) => void;
   onAddToCart: (item: InventoryItem) => void;
+  onRefresh?: () => Promise<void>;
 }
 
 type SortOption = "name" | "price-high" | "last-paid-high" | "category";
@@ -35,12 +38,14 @@ export function MasterInventory({
   onEditItem,
   onDeleteItem,
   onAddToCart,
+  onRefresh,
 }: MasterInventoryProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortOption>("name");
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
 
   const cartItemIds = useMemo(
     () => new Set(shoppingList.map((item) => item.inventoryItemId)),
@@ -93,7 +98,7 @@ export function MasterInventory({
     setEditingItem(item);
   };
 
-  const handleSaveEdit = (id: string, updates: { name: string; category: string; basePrice: number }) => {
+  const handleSaveEdit = (id: string, updates: { name: string; category: string; basePrice: number; unit?: string }) => {
     onEditItem(id, updates);
     setEditingItem(null);
   };
@@ -118,6 +123,12 @@ export function MasterInventory({
         />
       </div>
 
+      <InventoryUploadDialog
+        isOpen={isUploadOpen}
+        setIsOpen={setIsUploadOpen}
+        onRefresh={onRefresh || (async () => { })}
+      />
+
       <div className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -129,6 +140,13 @@ export function MasterInventory({
           />
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setIsUploadOpen(true)} className="hidden sm:flex">
+            <UploadCloud className="mr-2 h-4 w-4" />
+            Bulk Upload
+          </Button>
+          <Button variant="outline" size="icon" onClick={() => setIsUploadOpen(true)} className="sm:hidden">
+            <UploadCloud className="h-4 w-4" />
+          </Button>
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
             <SelectTrigger className="w-[180px] bg-input">

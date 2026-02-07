@@ -17,7 +17,7 @@ import {
 import { CATEGORIES } from "@/lib/types";
 
 interface AddItemDialogProps {
-  onAddItem: (item: { name: string; category: string; basePrice: number }) => void;
+  onAddItem: (item: { name: string; category: string; basePrice: number; unit?: string }) => void;
   isOpen?: boolean;
   setIsOpen?: (open: boolean) => void;
 }
@@ -27,6 +27,7 @@ export function AddItemDialog({ onAddItem, isOpen: controlledIsOpen, setIsOpen: 
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [unit, setUnit] = useState("pc");
 
   // Use controlled state if provided, otherwise use internal state
   const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : internalIsOpen;
@@ -40,11 +41,13 @@ export function AddItemDialog({ onAddItem, isOpen: controlledIsOpen, setIsOpen: 
       name: name.trim(),
       category,
       basePrice: Number.parseFloat(price),
+      unit: unit.trim() || "pc",
     });
 
     setName("");
     setCategory("");
     setPrice("");
+    setUnit("pc");
     setIsOpen(false);
   };
 
@@ -114,6 +117,17 @@ export function AddItemDialog({ onAddItem, isOpen: controlledIsOpen, setIsOpen: 
               placeholder="0.00"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              className="bg-input"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="unit">Unit</Label>
+            <Input
+              id="unit"
+              placeholder="e.g. pc, kg, L"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
               className="bg-input"
             />
           </div>

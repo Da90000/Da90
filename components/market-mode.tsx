@@ -1,9 +1,24 @@
-"use client";
-
 import { useMemo, useState } from "react";
 import { Loader2, ShoppingCart, Trash2 } from "lucide-react";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
 import { ShoppingListItemCard } from "@/components/shopping-list-item";
+import { SortableShoppingListItem } from "@/components/sortable-shopping-item";
 import { ShoppingProgress } from "@/components/shopping-progress";
 import { useCurrency } from "@/contexts/currency-context";
 import { toast } from "@/hooks/use-toast";
@@ -20,6 +35,7 @@ interface MarketModeProps {
   onRemoveItem: (id: string) => void;
   onClearList: () => void;
   onGoToInventory: () => void;
+  onReorder?: (items: ShoppingListItem[]) => void;
 }
 
 export function MarketMode({
@@ -32,41 +48,67 @@ export function MarketMode({
   onRemoveItem,
   onClearList,
   onGoToInventory,
+  onReorder,
 }: MarketModeProps) {
   const { formatPrice } = useCurrency();
   const [isSaving, setIsSaving] = useState(false);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Prevent accidental drags on simple clicks
+      },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250, // Long press to drag on touch
+        tolerance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const activeItems = useMemo(() => shoppingList.filter((item) => !item.purchased), [shoppingList]);
+  const purchasedItems = useMemo(() => shoppingList.filter((item) => item.purchased), [shoppingList]);
+
   const stats = useMemo(() => {
-    const purchased = shoppingList.filter((item) => item.purchased);
-    const budget = shoppingList.reduce((sum, item) => sum + item.basePrice * item.quantity, 0);
-    const estimatedTotal = shoppingList.reduce(
-      (sum, item) => sum + (item.manualPrice ?? item.basePrice) * item.quantity,
-      0
-    );
-    const purchasedValue = purchased.reduce(
-      (sum, item) => sum + (item.manualPrice ?? item.basePrice) * item.quantity,
-      0
-    );
+    // Use convertedQuantity for accurate pricing with unit conversions
+    const budget = shoppingList.reduce((sum, item) => {
+      const qty = item.convertedQuantity ?? item.quantity;
+      return sum + item.basePrice * qty;
+    }, 0);
+
+    const estimatedTotal = shoppingList.reduce((sum, item) => {
+      const qty = item.convertedQuantity ?? item.quantity;
+      return sum + (item.manualPrice ?? item.basePrice) * qty;
+    }, 0);
+
+    const purchasedValue = purchasedItems.reduce((sum, item) => {
+      const qty = item.convertedQuantity ?? item.quantity;
+      return sum + (item.manualPrice ?? item.basePrice) * qty;
+    }, 0);
 
     return {
       totalItems: shoppingList.length,
-      purchasedItems: purchased.length,
+      purchasedItems: purchasedItems.length,
       budget,
       estimatedTotal,
       purchasedValue,
     };
-  }, [shoppingList]);
+  }, [shoppingList, purchasedItems]);
 
-  const groupedByCategory = useMemo(() => {
-    const groups: Record<string, ShoppingListItem[]> = {};
-    for (const item of shoppingList) {
-      if (!groups[item.category]) {
-        groups[item.category] = [];
-      }
-      groups[item.category].push(item);
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+
+    if (active.id !== over?.id && onReorder) {
+      const oldIndex = shoppingList.findIndex((item) => item.id === active.id);
+      const newIndex = shoppingList.findIndex((item) => item.id === over?.id);
+
+      onReorder(arrayMove(shoppingList, oldIndex, newIndex));
     }
-    return groups;
-  }, [shoppingList]);
+  }
 
   if (shoppingList.length === 0) {
     return (
@@ -112,30 +154,61 @@ export function MarketMode({
         purchasedValue={stats.purchasedValue}
       />
 
-      <div className="space-y-6">
-        {Object.entries(groupedByCategory)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([category, items]) => (
-            <div key={category}>
-              <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                {category}
+      <div className="space-y-8">
+        {/* Active Items (Sortable) */}
+        {activeItems.length > 0 && (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                Active Items
               </h2>
-              <div className="space-y-2">
-                {items.map((item) => (
-                  <ShoppingListItemCard
-                    key={item.id}
-                    item={item}
-                    onTogglePurchased={onTogglePurchased}
-                    onUpdateQuantity={onUpdateQuantity}
-                    onUpdatePrice={onUpdatePrice}
-                    onUpdateUnit={onUpdateUnit}
-                    onUpdateNote={onUpdateNote}
-                    onRemove={onRemoveItem}
-                  />
-                ))}
-              </div>
+              <SortableContext items={activeItems} strategy={verticalListSortingStrategy}>
+                <div className="space-y-2">
+                  {activeItems.map((item) => (
+                    <SortableShoppingListItem
+                      key={item.id}
+                      id={item.id}
+                      item={item}
+                      onTogglePurchased={onTogglePurchased}
+                      onUpdateQuantity={onUpdateQuantity}
+                      onUpdatePrice={onUpdatePrice}
+                      onUpdateUnit={onUpdateUnit}
+                      onUpdateNote={onUpdateNote}
+                      onRemove={onRemoveItem}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
             </div>
-          ))}
+          </DndContext>
+        )}
+
+        {/* Purchased Items (Fixed at bottom) */}
+        {purchasedItems.length > 0 && (
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Completed
+            </h2>
+            <div className="space-y-2 opacity-80">
+              {purchasedItems.map((item) => (
+                <ShoppingListItemCard
+                  key={item.id}
+                  item={item}
+                  onTogglePurchased={onTogglePurchased}
+                  onUpdateQuantity={onUpdateQuantity}
+                  onUpdatePrice={onUpdatePrice}
+                  onUpdateUnit={onUpdateUnit}
+                  onUpdateNote={onUpdateNote}
+                  onRemove={onRemoveItem}
+                />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="sticky bottom-20 rounded-lg border border-border bg-card/95 backdrop-blur p-4 shadow-lg md:bottom-4">
@@ -152,11 +225,10 @@ export function MarketMode({
             <Button onClick={onGoToInventory} variant="outline" className="w-full gap-2 bg-transparent sm:w-auto">
               Add More Items
             </Button>
-            {shoppingList.some(item => item.purchased) && (
+            {purchasedItems.length > 0 && (
               <Button
                 onClick={async () => {
                   setIsSaving(true);
-                  const purchasedItems = shoppingList.filter((item) => item.purchased);
                   const { success, error } = await saveToLedger(purchasedItems);
                   setIsSaving(false);
 

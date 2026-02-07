@@ -50,7 +50,7 @@ export function InventoryItemCard({ item, onAddToCart, onDelete, onEdit, isInCar
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-foreground">Std:</span>
             <span className="text-lg font-bold text-foreground">
-              {item.basePrice.toFixed(2)} BDT
+              {item.basePrice.toFixed(2)} BDT {item.unit ? `/${item.unit}` : ""}
             </span>
           </div>
           {/* Last Paid Price - with color coding */}
@@ -60,13 +60,13 @@ export function InventoryItemCard({ item, onAddToCart, onDelete, onEdit, isInCar
               <span className="text-xs text-muted-foreground">Last:</span>
               <span
                 className={`text-sm font-medium ${item.lastPaidPrice > item.basePrice
-                    ? "text-destructive" // Red for trend up
-                    : item.lastPaidPrice < item.basePrice
-                      ? "text-green-600 dark:text-green-500" // Green for trend down
-                      : "text-muted-foreground" // Neutral if equal
+                  ? "text-destructive" // Red for trend up
+                  : item.lastPaidPrice < item.basePrice
+                    ? "text-green-600 dark:text-green-500" // Green for trend down
+                    : "text-muted-foreground" // Neutral if equal
                   }`}
               >
-                {item.lastPaidPrice.toFixed(2)} BDT
+                {item.lastPaidPrice.toFixed(2)} BDT {item.unit ? `/${item.unit}` : ""}
               </span>
             </div>
           )}

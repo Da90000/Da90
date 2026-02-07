@@ -20,13 +20,14 @@ interface EditItemDialogProps {
   item: InventoryItem | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (id: string, updates: { name: string; category: string; basePrice: number }) => void;
+  onSave: (id: string, updates: { name: string; category: string; basePrice: number; unit?: string }) => void;
 }
 
 export function EditItemDialog({ item, isOpen, onClose, onSave }: EditItemDialogProps) {
   const [name, setName] = useState("");
   const [category, setCategory] = useState("");
   const [price, setPrice] = useState("");
+  const [unit, setUnit] = useState("pc");
 
   // Update form when item changes
   useEffect(() => {
@@ -34,6 +35,7 @@ export function EditItemDialog({ item, isOpen, onClose, onSave }: EditItemDialog
       setName(item.name);
       setCategory(item.category);
       setPrice(item.basePrice.toString());
+      setUnit(item.unit || "pc");
     }
   }, [item]);
 
@@ -45,6 +47,7 @@ export function EditItemDialog({ item, isOpen, onClose, onSave }: EditItemDialog
       name: name.trim(),
       category,
       basePrice: Number.parseFloat(price),
+      unit: unit.trim() || undefined,
     });
 
     onClose();
@@ -114,6 +117,17 @@ export function EditItemDialog({ item, isOpen, onClose, onSave }: EditItemDialog
             <p className="text-xs text-muted-foreground">
               Update this if the standard market price has permanently changed
             </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="edit-unit">Unit</Label>
+            <Input
+              id="edit-unit"
+              placeholder="e.g. pc, kg, L"
+              value={unit}
+              onChange={(e) => setUnit(e.target.value)}
+              className="bg-input"
+            />
           </div>
 
           <div className="flex gap-3 pt-4">

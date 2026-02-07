@@ -3,6 +3,7 @@ export interface InventoryItem {
   name: string;
   category: string;
   basePrice: number;
+  unit?: string;
   lastPaidPrice?: number; // Last price paid when purchased (optional)
   createdAt: Date;
 }
@@ -18,6 +19,10 @@ export interface ShoppingListItem {
   manualPrice?: number;
   quantity: number;
   unit?: string;
+  /** Original unit from inventory (for conversion reference) */
+  baseUnit?: string;
+  /** Quantity converted to base unit (for price calculation) */
+  convertedQuantity?: number;
   note?: string;
   lastPaidPrice?: number;
   purchased: boolean;

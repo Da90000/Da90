@@ -100,7 +100,8 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     period,
     setPeriod,
     fetchDashboardData,
-    isLoading
+    isLoading,
+    rawLedger
   } = useDashboardStore();
 
   const [isTransactionOpen, setIsTransactionOpen] = useState(false);
@@ -199,7 +200,7 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  if (isLoading && !stats.balance) { // Show skeleton only on initial load if no data
+  if (isLoading && rawLedger.length === 0) { // Show skeleton only on initial load if no data
     return <DashboardSkeleton />;
   }
 
@@ -458,38 +459,33 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                 </p>
               </div>
               <div className="flex items-center justify-end">
-                <div className="relative flex items-center bg-muted/50 p-1 rounded-xl w-[240px]">
-                  {/* Sliding Background */}
+                <div className="relative grid grid-cols-3 bg-muted/50 p-1 rounded-xl w-[240px]">
+                  {/* Sliding Background - Simplified percentage positioning for smooth transition */}
                   <div
-                    className="absolute inset-y-1 bg-background rounded-lg shadow-sm transition-all duration-300 ease-out"
+                    className="absolute top-1 bottom-1 bg-background rounded-lg shadow-sm transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] will-change-transform"
                     style={{
-                      width: "calc(33.33% - 4px)",
-                      left: period === "week" ? "4px" : period === "month" ? "calc(33.33% + 2px)" : "calc(66.66% + 0px)",
+                      width: "32%",
+                      left: period === "week" ? "1%" : period === "month" ? "34%" : "67%"
                     }}
                   />
 
-                  {/* Note: Adjusting left calc to perfectly align. 
-                      Container padding 4px (p-1). 
-                      Width approx 33%.
-                  */}
-
                   <button
                     onClick={() => setPeriod("week")}
-                    className={`relative z-10 flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "week" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
+                    className={`relative z-10 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "week" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
                       }`}
                   >
                     Week
                   </button>
                   <button
                     onClick={() => setPeriod("month")}
-                    className={`relative z-10 flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "month" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
+                    className={`relative z-10 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "month" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
                       }`}
                   >
                     Month
                   </button>
                   <button
                     onClick={() => setPeriod("year")}
-                    className={`relative z-10 flex-1 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "year" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
+                    className={`relative z-10 py-1.5 text-xs font-semibold rounded-lg transition-colors duration-200 ${period === "year" ? "text-foreground font-bold" : "text-muted-foreground hover:text-foreground/80"
                       }`}
                   >
                     Year
@@ -553,8 +549,8 @@ export function DashboardView({ onNavigate }: DashboardViewProps) {
                     stroke="#10b981"
                     strokeWidth={2}
                     fill="url(#colorEmerald)"
-                    animationDuration={800}
-                    animationEasing="ease-in-out"
+                    animationDuration={500}
+                    animationEasing="ease-out"
                   />
                 </AreaChart>
               </ResponsiveContainer>

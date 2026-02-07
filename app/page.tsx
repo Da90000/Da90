@@ -22,6 +22,7 @@ import {
   updateInventoryItem,
   deleteInventoryItem,
   getShoppingList,
+  saveShoppingList,
   addToShoppingList,
   removeFromShoppingList,
   togglePurchased,
@@ -112,7 +113,7 @@ export default function ShopListApp() {
   }, [isCheckingAuth]);
 
   // Inventory handlers
-  const handleAddItem = useCallback(async (item: { name: string; category: string; basePrice: number }) => {
+  const handleAddItem = useCallback(async (item: { name: string; category: string; basePrice: number; unit?: string }) => {
     try {
       // Generate ID for the item
       const id = crypto.randomUUID();
@@ -140,7 +141,7 @@ export default function ShopListApp() {
     }
   }, []);
 
-  const handleEditItem = useCallback(async (id: string, updates: { name: string; category: string; basePrice: number }) => {
+  const handleEditItem = useCallback(async (id: string, updates: { name: string; category: string; basePrice: number; unit?: string }) => {
     try {
       // Update locally first for instant UI feedback
       updateInventoryItem(id, updates);
@@ -149,7 +150,7 @@ export default function ShopListApp() {
       setInventory((prev) =>
         prev.map((item) =>
           item.id === id
-            ? { ...item, name: updates.name, category: updates.category, basePrice: updates.basePrice }
+            ? { ...item, name: updates.name, category: updates.category, basePrice: updates.basePrice, unit: updates.unit }
             : item
         )
       );
@@ -224,9 +225,26 @@ export default function ShopListApp() {
     setCurrentView("inventory");
   }, []);
 
+  const handleReorder = useCallback((items: ShoppingListItem[]) => {
+    saveShoppingList(items);
+    setShoppingList(items);
+  }, []);
+
   const handleNavigate = useCallback((mode: ViewMode) => {
     setCurrentView(mode);
   }, []);
+
+  const handleRefreshInventory = async () => {
+    try {
+      const dbInventory = await fetchInventoryFromSupabase();
+      if (dbInventory.length > 0) {
+        setInventory(dbInventory);
+        saveInventory(dbInventory);
+      }
+    } catch (error) {
+      console.error("Failed to refresh inventory:", error);
+    }
+  };
 
   if (isCheckingAuth || !isLoaded) {
     return (
@@ -264,7 +282,9 @@ export default function ShopListApp() {
             onAddItem={handleAddItem}
             onEditItem={handleEditItem}
             onDeleteItem={handleDeleteItem}
+
             onAddToCart={handleAddToCart}
+            onRefresh={handleRefreshInventory}
           />
         )}
         {currentView === "market" && (
@@ -278,6 +298,7 @@ export default function ShopListApp() {
             onRemoveItem={handleRemoveItem}
             onClearList={handleClearList}
             onGoToInventory={handleGoToInventory}
+            onReorder={handleReorder}
           />
         )}
         {currentView === "expenses" && <LedgerHistory />}

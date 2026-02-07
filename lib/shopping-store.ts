@@ -1,4 +1,5 @@
 import type { InventoryItem, ShoppingListItem } from "./types";
+import { convertQuantity } from "./unit-conversions";
 import { supabase } from "@/lib/supabase";
 
 /**
@@ -28,6 +29,7 @@ export async function fetchInventoryFromSupabase(): Promise<InventoryItem[]> {
     name: item.name,
     category: item.category,
     basePrice: parseFloat(item.base_price) || 0,
+    unit: item.unit,
     lastPaidPrice: item.last_paid_price ? parseFloat(item.last_paid_price) : undefined,
     createdAt: new Date(item.created_at),
   })) as InventoryItem[];
@@ -52,6 +54,7 @@ export async function addInventoryItemToSupabase(
     name: item.name,
     category: item.category,
     base_price: item.basePrice,
+    unit: item.unit,
     created_at: new Date().toISOString(),
   };
 
@@ -82,6 +85,7 @@ export async function addInventoryItemToSupabase(
     name: data.name,
     category: data.category,
     basePrice: parseFloat(data.base_price) || 0,
+    unit: data.unit,
     lastPaidPrice: data.last_paid_price ? parseFloat(data.last_paid_price) : undefined,
     createdAt: new Date(data.created_at),
   } as InventoryItem;
@@ -200,7 +204,7 @@ export function addInventoryItem(
  */
 export async function updateInventoryItemInSupabase(
   id: string,
-  updates: { name: string; category: string; basePrice: number }
+  updates: { name: string; category: string; basePrice: number; unit?: string }
 ): Promise<InventoryItem | null> {
   if (!supabase) {
     console.warn("Supabase client not initialized. Skipping sync.");
@@ -211,6 +215,7 @@ export async function updateInventoryItemInSupabase(
     name: updates.name,
     category: updates.category,
     base_price: updates.basePrice,
+    unit: updates.unit,
   };
 
   const { data, error } = await supabase
@@ -236,6 +241,7 @@ export async function updateInventoryItemInSupabase(
     name: data.name,
     category: data.category,
     basePrice: parseFloat(data.base_price) || 0,
+    unit: data.unit,
     lastPaidPrice: data.last_paid_price ? parseFloat(data.last_paid_price) : undefined,
     createdAt: new Date(data.created_at),
   } as InventoryItem;
@@ -248,7 +254,7 @@ export async function updateInventoryItemInSupabase(
  */
 export function updateInventoryItem(
   id: string,
-  updates: { name: string; category: string; basePrice: number }
+  updates: { name: string; category: string; basePrice: number; unit?: string }
 ): void {
   const inventory = getInventory();
   const item = inventory.find((item) => item.id === id);
@@ -258,6 +264,7 @@ export function updateInventoryItem(
   item.name = updates.name;
   item.category = updates.category;
   item.basePrice = updates.basePrice;
+  if (updates.unit) item.unit = updates.unit;
   // lastPaidPrice is preserved automatically
 
   saveInventory(inventory);
@@ -300,15 +307,27 @@ export function saveShoppingList(items: ShoppingListItem[]): void {
 }
 
 export function addToShoppingList(
-  inventoryItem: InventoryItem
+  inventoryItem: InventoryItem,
+  options?: { quantity?: number; unit?: string }
 ): ShoppingListItem {
   const shoppingList = getShoppingList();
   const existing = shoppingList.find(
     (item) => item.inventoryItemId === inventoryItem.id
   );
 
+  const quantity = options?.quantity ?? 1;
+  const selectedUnit = options?.unit ?? inventoryItem.unit ?? "pc";
+  const baseUnit = inventoryItem.unit ?? "pc";
+
+  // Calculate converted quantity for price calculation
+  const convertedQty = selectedUnit === baseUnit
+    ? quantity
+    : (convertQuantity(quantity, selectedUnit, baseUnit) ?? quantity);
+
   if (existing) {
-    existing.quantity += 1;
+    existing.quantity += quantity;
+    existing.unit = selectedUnit;
+    existing.convertedQuantity = (existing.convertedQuantity ?? existing.quantity) + convertedQty;
     saveShoppingList(shoppingList);
     return existing;
   }
@@ -320,7 +339,10 @@ export function addToShoppingList(
     category: inventoryItem.category,
     basePrice: inventoryItem.basePrice,
     lastPaidPrice: inventoryItem.lastPaidPrice,
-    quantity: 1,
+    quantity,
+    unit: selectedUnit,
+    baseUnit,
+    convertedQuantity: convertedQty,
     purchased: false,
   };
   shoppingList.push(newItem);
@@ -336,9 +358,22 @@ export function removeFromShoppingList(id: string): void {
 
 export function togglePurchased(id: string): void {
   const shoppingList = getShoppingList();
-  const item = shoppingList.find((item) => item.id === id);
-  if (item) {
+  const index = shoppingList.findIndex((item) => item.id === id);
+  if (index !== -1) {
+    const item = shoppingList[index];
     item.purchased = !item.purchased;
+
+    // Remove item from current position
+    shoppingList.splice(index, 1);
+
+    if (item.purchased) {
+      // Move to bottom if purchased
+      shoppingList.push(item);
+    } else {
+      // Move to top if unpurchased
+      shoppingList.unshift(item);
+    }
+
     saveShoppingList(shoppingList);
   }
 }
@@ -348,6 +383,15 @@ export function updateQuantity(id: string, quantity: number): void {
   const item = shoppingList.find((item) => item.id === id);
   if (item) {
     item.quantity = Math.max(1, quantity);
+
+    // Recalculate converted quantity if units differ
+    if (item.unit && item.baseUnit && item.unit !== item.baseUnit) {
+      const converted = convertQuantity(item.quantity, item.unit, item.baseUnit);
+      item.convertedQuantity = converted ?? item.quantity;
+    } else {
+      item.convertedQuantity = item.quantity;
+    }
+
     saveShoppingList(shoppingList);
   }
 }
@@ -370,6 +414,15 @@ export function updateItemUnit(id: string, unit: string): void {
   const item = shoppingList.find((item) => item.id === id);
   if (item) {
     item.unit = unit;
+
+    // Recalculate converted quantity with new unit
+    if (item.baseUnit && item.unit !== item.baseUnit) {
+      const converted = convertQuantity(item.quantity, item.unit, item.baseUnit);
+      item.convertedQuantity = converted ?? item.quantity;
+    } else {
+      item.convertedQuantity = item.quantity;
+    }
+
     saveShoppingList(shoppingList);
   }
 }

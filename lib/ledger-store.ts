@@ -71,13 +71,14 @@ export function addToLedger(items: ShoppingListItem[]): void {
 
   const newEntries: LedgerEntry[] = items.map(item => {
     const price = item.manualPrice ?? item.basePrice;
+    const qty = item.convertedQuantity ?? item.quantity; // Use converted quantity
     return {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
       itemName: item.name,
       category: item.category,
-      amount: price * item.quantity,
-      quantity: item.quantity,
+      amount: price * qty,
+      quantity: qty,
     };
   });
 
@@ -159,11 +160,12 @@ export async function saveToLedger(
 
   const mappedItems = items.map((item) => {
     const price = item.manualPrice ?? item.basePrice;
-    const amount = Number(price) * Number(item.quantity);
+    const qty = item.convertedQuantity ?? item.quantity; // Use converted quantity for accurate pricing
+    const amount = Number(price) * Number(qty);
     return {
       item_name: item.name,
       category: item.category,
-      quantity: item.quantity,
+      quantity: qty, // Store converted quantity in ledger
       amount: Number.isFinite(amount) ? amount : 0,
       transaction_type: "expense" as TransactionType,
       created_at: new Date().toISOString(),

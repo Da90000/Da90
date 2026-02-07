@@ -104,14 +104,14 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
   error: null,
 
   setPeriod: (period: Period) => {
-    set({ period });
     // Re-process chart data immediately using cached rawLedger
     const { rawLedger } = get();
     if (rawLedger.length > 0) {
       const chartData = processChartData(rawLedger, period);
-      set({ chartData });
+      set({ period, chartData });
     } else {
       // If no data yet, fetch it
+      set({ period });
       get().fetchDashboardData();
     }
   },

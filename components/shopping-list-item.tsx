@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Minus, Plus, Trash2, TrendingUp, TrendingDown, MessageSquarePlus, Info } from "lucide-react";
+import { Minus, Plus, Trash2, TrendingUp, TrendingDown, MessageSquarePlus, Info, GripVertical } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/popover";
 import type { ShoppingListItem } from "@/lib/types";
 import { useCurrency } from "@/contexts/currency-context";
+import { getCompatibleUnits, formatUnit } from "@/lib/unit-conversions";
 
 interface ShoppingListItemCardProps {
   item: ShoppingListItem;
@@ -35,6 +36,7 @@ interface ShoppingListItemCardProps {
   onUpdateUnit: (id: string, unit: string) => void;
   onUpdateNote: (id: string, note: string) => void;
   onRemove: (id: string) => void;
+  dragHandleProps?: Record<string, any>;
 }
 
 export function ShoppingListItemCard({
@@ -45,6 +47,7 @@ export function ShoppingListItemCard({
   onUpdateUnit,
   onUpdateNote,
   onRemove,
+  dragHandleProps,
 }: ShoppingListItemCardProps) {
   const { formatPrice, currencySymbol } = useCurrency();
   const effectivePrice = item.manualPrice ?? item.basePrice;
@@ -82,7 +85,14 @@ export function ShoppingListItemCard({
     onUpdateNote(item.id, note);
   };
 
-  const totalItemPrice = (item.manualPrice ?? item.basePrice) * item.quantity;
+  // Calculate effective price using converted quantity
+  const priceCalcQuantity = item.convertedQuantity ?? item.quantity;
+  const totalItemPrice = (item.manualPrice ?? item.basePrice) * priceCalcQuantity;
+
+  // Get compatible units for selector
+  const compatibleUnits = item.baseUnit
+    ? getCompatibleUnits(item.baseUnit)
+    : ['pc', 'kg', 'liter', 'dozen', 'hali'];
 
   // Trend Logic (Compare effective unit price vs last paid)
   // item.lastPaidPrice is historical. effectivePrice is current.
@@ -110,13 +120,21 @@ export function ShoppingListItemCard({
   return (
     <div
       className={`relative flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-sm transition-all ${item.purchased
-          ? "border-emerald-200 bg-emerald-50/50 opacity-60"
-          : "border-border/40"
+        ? "border-emerald-200 bg-emerald-50/50 opacity-60"
+        : "border-border/40"
         }`}
     >
       {/* Top Row: Checkbox, Name/Base, Total */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3 flex-1 min-w-0">
+          {dragHandleProps && (
+            <div
+              {...dragHandleProps}
+              className="mt-1 cursor-grab active:cursor-grabbing text-muted-foreground/50 hover:text-muted-foreground shrink-0 touch-none"
+            >
+              <GripVertical className="h-5 w-5" />
+            </div>
+          )}
           <Checkbox
             checked={item.purchased}
             onCheckedChange={() => onTogglePurchased(item.id)}
@@ -128,8 +146,13 @@ export function ShoppingListItemCard({
             </h3>
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-xs text-muted-foreground">
-                Base: {formatPrice(item.basePrice)}
+                Base: {formatPrice(item.basePrice)}{item.baseUnit ? `/${formatUnit(item.baseUnit)}` : ''}
               </span>
+              {item.convertedQuantity && item.convertedQuantity !== item.quantity && (
+                <span className="text-[10px] text-blue-600 font-medium">
+                  ({item.convertedQuantity.toFixed(2)} {formatUnit(item.baseUnit || 'pc')})
+                </span>
+              )}
               {item.note && (
                 <span className="inline-flex items-center rounded-full bg-yellow-100 px-2 py-0.5 text-[10px] font-medium text-yellow-800">
                   {item.note}
@@ -209,18 +232,23 @@ export function ShoppingListItemCard({
         </Popover>
 
         {/* Unit Selector */}
-        <Select value={item.unit || "each"} onValueChange={(val) => onUpdateUnit(item.id, val)}>
+        <Select
+          value={item.unit || item.baseUnit || "pc"}
+          onValueChange={(val) => onUpdateUnit(item.id, val)}
+        >
           <SelectTrigger className="h-9 w-[80px] text-xs bg-gray-50 border-gray-200">
             <SelectValue placeholder="Unit" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="each">Each</SelectItem>
-            <SelectItem value="kg">kg</SelectItem>
-            <SelectItem value="litre">Litre</SelectItem>
-            <SelectItem value="dozen">Dozen</SelectItem>
-            <SelectItem value="pack">Pack</SelectItem>
+            {compatibleUnits.map((unit) => (
+              <SelectItem key={unit} value={unit}>
+                {formatUnit(unit)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
+
+
 
         {/* Quantity Stepper */}
         <div className="flex items-center h-9 bg-gray-50 rounded-lg border border-gray-200">
