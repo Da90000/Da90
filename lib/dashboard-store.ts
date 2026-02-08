@@ -443,8 +443,9 @@ export const useDashboardStore = create<DashboardState>((set, get) => ({
       });
 
     } catch (err: any) {
-      console.error("Dashboard fetch error:", err);
-      set({ error: err.message, isLoading: false });
+      const errorMsg = err instanceof Error ? err.message : JSON.stringify(err, null, 2);
+      console.error("Dashboard fetch error:", errorMsg);
+      set({ error: errorMsg, isLoading: false });
     }
   }
 }));

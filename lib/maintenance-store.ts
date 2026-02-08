@@ -52,7 +52,8 @@ export async function fetchMaintenanceItems(): Promise<MaintenanceItem[]> {
     .order("last_service_date", { ascending: true, nullsFirst: false });
 
   if (error) {
-    console.error("Supabase maintenance_items fetch error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase maintenance_items fetch error:", errorMsg);
     return [];
   }
   if (!data) return [];
@@ -101,7 +102,8 @@ export async function addMaintenanceItem(
     .single();
 
   if (error) {
-    console.error("Supabase maintenance_items insert error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase maintenance_items insert error:", errorMsg);
     return null;
   }
   if (!data) return null;
@@ -144,7 +146,8 @@ export async function updateServiceDate(
 
   const { error: logError } = await supabase.from("maintenance_logs").insert(logPayload);
   if (logError) {
-    console.error("Maintenance log insert error:", logError);
+    const errorMsg = logError instanceof Error ? logError.message : JSON.stringify(logError, null, 2);
+    console.error("Maintenance log insert error:", errorMsg);
     return false;
   }
 
@@ -155,7 +158,8 @@ export async function updateServiceDate(
     .eq("id", id);
 
   if (updateError) {
-    console.error("Supabase maintenance_items updateServiceDate error:", updateError);
+    const errorMsg = updateError instanceof Error ? updateError.message : JSON.stringify(updateError, null, 2);
+    console.error("Supabase maintenance_items updateServiceDate error:", errorMsg);
     return false;
   }
   return true;
@@ -188,7 +192,8 @@ export async function updateMaintenanceItem(
     .eq("id", id);
 
   if (error) {
-    console.error("Supabase maintenance_items updateMaintenanceItem error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase maintenance_items updateMaintenanceItem error:", errorMsg);
     return false;
   }
   return true;
@@ -208,7 +213,8 @@ export async function deleteMaintenanceItem(id: string): Promise<boolean> {
     .eq("item_id", id);
 
   if (logError) {
-    console.error("Failed to delete associated maintenance logs:", logError);
+    const errorMsg = logError instanceof Error ? logError.message : JSON.stringify(logError, null, 2);
+    console.error("Failed to delete associated maintenance logs:", errorMsg);
     // Proceed anyway? No, logs must go first. But if logs table doesn't exist or permissions...
     // We'll return false to be safe.
     return false;
@@ -221,7 +227,8 @@ export async function deleteMaintenanceItem(id: string): Promise<boolean> {
     .eq("id", id);
 
   if (error) {
-    console.error("Supabase maintenance_items deleteMaintenanceItem error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase maintenance_items deleteMaintenanceItem error:", errorMsg);
     return false;
   }
   return true;

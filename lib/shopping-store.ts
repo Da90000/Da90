@@ -18,7 +18,8 @@ export async function fetchInventoryFromSupabase(): Promise<InventoryItem[]> {
     .order("created_at", { ascending: false });
 
   if (error) {
-    console.error("Supabase fetch error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase fetch error:", errorMsg);
     return [];
   }
   if (!data) return [];
@@ -70,7 +71,8 @@ export async function addInventoryItemToSupabase(
     .single();
 
   if (error) {
-    console.error("Supabase insert error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase insert error:", errorMsg);
     return null;
   }
 
@@ -103,7 +105,8 @@ export async function deleteInventoryItemFromSupabase(id: string): Promise<boole
   const { error } = await supabase.from("inventory").delete().eq("id", id);
 
   if (error) {
-    console.error("Supabase delete error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase delete error:", errorMsg);
     return false;
   }
 
@@ -141,7 +144,8 @@ export async function addToLedger(
   const { data, error } = await supabase.from("ledger").insert(payload).select();
 
   if (error) {
-    console.error("Supabase ledger insert error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase ledger insert error:", errorMsg);
     return null;
   }
 
@@ -192,7 +196,8 @@ export function addInventoryItem(
 
   // Sync to Supabase in the background (using the same ID for consistency)
   addInventoryItemToSupabase(item, newItem.id).catch((error) => {
-    console.error("Failed to sync inventory item to Supabase:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Failed to sync inventory item to Supabase:", errorMsg);
   });
 
   return newItem;
@@ -226,7 +231,8 @@ export async function updateInventoryItemInSupabase(
     .single();
 
   if (error) {
-    console.error("Supabase update error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase update error:", errorMsg);
     return null;
   }
 
@@ -271,7 +277,8 @@ export function updateInventoryItem(
 
   // Sync to Supabase in the background
   updateInventoryItemInSupabase(id, updates).catch((error) => {
-    console.error("Failed to sync inventory update to Supabase:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Failed to sync inventory update to Supabase:", errorMsg);
   });
 }
 
@@ -286,7 +293,8 @@ export function deleteInventoryItem(id: string): void {
 
   // Sync to Supabase in the background
   deleteInventoryItemFromSupabase(id).catch((error) => {
-    console.error("Failed to sync inventory deletion to Supabase:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Failed to sync inventory deletion to Supabase:", errorMsg);
   });
 }
 

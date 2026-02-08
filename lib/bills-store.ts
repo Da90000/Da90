@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { secureSupabaseCall } from "@/lib/sync-service";
 
 export interface RecurringBill {
   id: string;
@@ -151,10 +152,22 @@ export async function addBill(
     // Add user_id from authenticated user
     insertPayload.user_id = user.id;
 
-    const { data, error } = await supabase
-      .from("recurring_bills")
-      .insert(insertPayload)
-      .select();
+    // Use secureSupabaseCall for offline support
+    const { data, error, queued } = await secureSupabaseCall(
+      async () => await supabase
+        .from("recurring_bills")
+        .insert(insertPayload)
+        .select(),
+      {
+        table: "recurring_bills",
+        type: "INSERT",
+        payload: insertPayload
+      }
+    );
+
+    if (queued) {
+      return { success: true, error: null }; // Optimistically return success
+    }
 
     if (error) {
       // Improved error logging with JSON.stringify
@@ -194,7 +207,7 @@ export async function addBill(
       };
     }
 
-    if (!data || data.length === 0) {
+    if (!Array.isArray(data) || data.length === 0) {
       return {
         success: false,
         error: new Error("Bill was created but no data was returned. Please refresh the page."),
@@ -219,13 +232,26 @@ export async function addBill(
 export async function logBillPayment(billName: string, amount: number): Promise<boolean> {
   const supabase = createClient();
   if (!supabase) return false;
-  const { error } = await supabase.from("ledger").insert({
+
+  const payload = {
     item_name: `${billName} (Recurring)`,
     category: "Bill",
     quantity: 1,
     amount: Number.isFinite(amount) && amount >= 0 ? amount : 0,
     created_at: new Date().toISOString(),
-  });
+  };
+
+  const { error, queued } = await secureSupabaseCall(
+    async () => await supabase.from("ledger").insert(payload),
+    {
+      table: "ledger",
+      type: "INSERT",
+      payload
+    }
+  );
+
+  if (queued) return true; // Optimistic success
+
   if (error) {
     console.error("logBillPayment error:", error);
     return false;
@@ -263,10 +289,21 @@ export async function updateBill(
       updatePayload.category = updates.category ? updates.category.trim() : null;
     }
 
-    const { error } = await supabase
-      .from("recurring_bills")
-      .update(updatePayload)
-      .eq("id", billId);
+    const { error, queued } = await secureSupabaseCall(
+      async () => await supabase
+        .from("recurring_bills")
+        .update(updatePayload)
+        .eq("id", billId),
+      {
+        table: "recurring_bills",
+        type: "UPDATE",
+        payload: { id: billId, data: updatePayload }
+      }
+    );
+
+    if (queued) {
+      return { success: true, error: null };
+    }
 
     if (error) {
       console.error("updateBill error:", error);
@@ -297,10 +334,21 @@ export async function deleteBill(billId: string): Promise<{ success: boolean; er
       return { success: false, error: new Error("Supabase client not initialized") };
     }
 
-    const { error } = await supabase
-      .from("recurring_bills")
-      .delete()
-      .eq("id", billId);
+    const { error, queued } = await secureSupabaseCall(
+      async () => await supabase
+        .from("recurring_bills")
+        .delete()
+        .eq("id", billId),
+      {
+        table: "recurring_bills",
+        type: "DELETE",
+        payload: { id: billId }
+      }
+    );
+
+    if (queued) {
+      return { success: true, error: null };
+    }
 
     if (error) {
       console.error("deleteBill error:", error);

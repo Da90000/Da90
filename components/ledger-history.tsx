@@ -163,7 +163,7 @@ export function LedgerHistory() {
 
     setIncomeSaving(true);
     try {
-      const { success, error } = await addTransaction({
+      const { success, error, offline } = await addTransaction({
         item_name: incomeSource.trim(),
         category: "Income",
         amount,
@@ -171,7 +171,10 @@ export function LedgerHistory() {
       });
 
       if (success) {
-        toast({ title: "Income added successfully" });
+        toast({
+          title: offline ? "Saved (Offline)" : "Income added successfully",
+          description: offline ? "Transaction saved locally and will sync when online." : undefined
+        });
         setIncomeOpen(false);
         setIncomeAmount("");
         setIncomeSource("");
@@ -197,7 +200,7 @@ export function LedgerHistory() {
 
     setDebtSaving(true);
     try {
-      const { success, error } = await addTransaction({
+      const { success, error, offline } = await addTransaction({
         item_name: debtType === "debt_given" ? `Given to ${debtEntity.trim()}` : `Borrowed from ${debtEntity.trim()}`,
         category: "Debt",
         amount,
@@ -206,7 +209,10 @@ export function LedgerHistory() {
       });
 
       if (success) {
-        toast({ title: "Debt added successfully" });
+        toast({
+          title: offline ? "Saved (Offline)" : "Debt added successfully",
+          description: offline ? "Transaction saved locally and will sync when online." : undefined
+        });
         setDebtOpen(false);
         setDebtAmount("");
         setDebtEntity("");
@@ -239,7 +245,7 @@ export function LedgerHistory() {
         ? new Date(expenseDate + "T23:59:59").toISOString()
         : new Date().toISOString();
 
-      const { success, error } = await addTransaction({
+      const { success, error, offline } = await addTransaction({
         item_name: expenseItemName.trim(),
         category: expenseCategory,
         amount,
@@ -248,7 +254,10 @@ export function LedgerHistory() {
       });
 
       if (success) {
-        toast({ title: "Expense Logged" });
+        toast({
+          title: offline ? "Saved (Offline)" : "Expense Logged",
+          description: offline ? "Transaction saved locally and will sync when online." : undefined
+        });
         setExpenseOpen(false);
         setExpenseItemName("");
         setExpenseAmount("");
@@ -289,7 +298,7 @@ export function LedgerHistory() {
 
     setPaymentSaving(true);
     try {
-      const { success, error } = await addDebtPayment(
+      const { success, error, offline } = await addDebtPayment(
         paymentDebtId,
         amount,
         paymentNote.trim() || undefined,
@@ -297,7 +306,10 @@ export function LedgerHistory() {
       );
 
       if (success) {
-        toast({ title: "Payment recorded successfully" });
+        toast({
+          title: offline ? "Saved (Offline)" : "Payment recorded successfully",
+          description: offline ? "Payment saved locally and will sync when online." : undefined
+        });
         setPaymentOpen(false);
         setPaymentDebtId(null);
         setPaymentAmount("");
@@ -424,7 +436,7 @@ export function LedgerHistory() {
   // Handle unified dialog submission
   const handleUnifiedDialogSubmit = async (data: TransactionData) => {
     try {
-      const { success, error } = await addTransaction({
+      const { success, error, offline } = await addTransaction({
         item_name: data.type.startsWith("debt_")
           ? (data.debtType === "debt_given" ? `Given to ${data.entityName}` : `Borrowed from ${data.entityName}`)
           : data.itemName,
@@ -436,7 +448,10 @@ export function LedgerHistory() {
       });
 
       if (success) {
-        toast({ title: `${data.type.charAt(0).toUpperCase() + data.type.slice(1)} added successfully` });
+        toast({
+          title: offline ? "Saved (Offline)" : `${data.type.charAt(0).toUpperCase() + data.type.slice(1)} added successfully`,
+          description: offline ? "Transaction saved locally and will sync when online." : undefined
+        });
         await loadData();
       } else {
         toast({

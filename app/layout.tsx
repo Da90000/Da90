@@ -6,6 +6,7 @@ import { Toaster } from '@/components/ui/toaster'
 import { CurrencyProvider } from '@/contexts/currency-context'
 import { ThemeProvider } from '@/components/theme-provider'
 import { AiChatButton } from '@/components/ai-chat-button'
+import { OfflineSyncProvider } from '@/components/offline-sync-provider'
 import './globals.css'
 
 const font = Inter({ subsets: ["latin"], variable: "--font-sans" });
@@ -63,10 +64,12 @@ export default function RootLayout({
       <body className={`min-h-screen bg-background font-sans antialiased tracking-tight ${font.variable}`} suppressHydrationWarning>
         <ThemeProvider disableTransitionOnChange>
           <CurrencyProvider>
-            {children}
-            <AiChatButton />
-            <Toaster />
-            <Analytics />
+            <OfflineSyncProvider>
+              {children}
+              <AiChatButton />
+              <Toaster />
+              <Analytics />
+            </OfflineSyncProvider>
           </CurrencyProvider>
         </ThemeProvider>
       </body>

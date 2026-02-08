@@ -66,7 +66,8 @@ export async function fetchAnalyticsData(): Promise<AnalyticsData> {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Supabase analytics fetch error:", error);
+    const errorMsg = error instanceof Error ? error.message : JSON.stringify(error, null, 2);
+    console.error("Supabase analytics fetch error:", errorMsg);
     return {
       categoryData: [],
       dailyData: [],
