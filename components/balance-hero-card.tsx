@@ -23,10 +23,29 @@ export function BalanceHeroCard({
 }: BalanceHeroCardProps) {
     const [isBalanceHidden, setIsBalanceHidden] = useState(false)
 
-    // Load balance visibility preference
     useEffect(() => {
-        const hidden = localStorage.getItem('balanceHidden') === 'true'
-        setIsBalanceHidden(hidden)
+        // Check local storage for settings
+        const hideDefault = localStorage.getItem('hideBalanceDefault') === 'true'
+        const autoHide = localStorage.getItem('autoHidePublic') === 'true'
+        const manualHidden = localStorage.getItem('balanceHidden') === 'true'
+
+        // Determine visibility based on hierarchy: Auto-Hide > Default > Manual
+        let shouldHide = manualHidden
+
+        if (hideDefault) {
+            shouldHide = true
+        }
+
+        if (autoHide) {
+            const now = new Date()
+            const hour = now.getHours()
+            // 8-9 AM or 5-7 PM
+            if ((hour >= 8 && hour < 9) || (hour >= 17 && hour < 19)) {
+                shouldHide = true
+            }
+        }
+
+        setIsBalanceHidden(shouldHide)
     }, [])
 
     const toggleBalanceVisibility = () => {

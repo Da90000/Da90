@@ -231,8 +231,13 @@ export default function ShopListApp() {
   }, []);
 
   const handleNavigate = useCallback((mode: ViewMode) => {
-    setCurrentView(mode);
-  }, []);
+    if (mode === "expenses") router.push("/spending");
+    else if (mode === "bills") router.push("/budget");
+    else if (mode === "inventory") router.push("/inventory");
+    else if (mode === "market") router.push("/market");
+    else if (mode === "settings") router.push("/settings");
+    else setCurrentView(mode);
+  }, [router]);
 
   const handleRefreshInventory = async () => {
     try {
@@ -308,11 +313,7 @@ export default function ShopListApp() {
         {currentView === "settings" && <SettingsView />}
       </main>
 
-      <BottomNav
-        currentView={currentView}
-        onViewChange={setCurrentView}
-        shoppingListCount={shoppingList.length}
-      />
+      <BottomNav />
     </div>
   );
 }
