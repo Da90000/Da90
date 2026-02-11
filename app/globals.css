@@ -1,45 +1,92 @@
+/* ENHANCED VERSION - Merges your existing code with mobile-first additions */
+
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* ShopList Pro Theme (Emerald Base) */
-  --background: #f9fafb;
-  /* Light gray background like the image */
-  --foreground: #1c1c1e;
-  /* Dark text */
+  /* Colors - Emerald Primary (#10B981) */
+  --background: #ffffff;
+  --foreground: #09090b;
 
   --card: #ffffff;
-  --card-foreground: #1c1c1e;
+  --card-foreground: #09090b;
 
   --popover: #ffffff;
-  --popover-foreground: #1c1c1e;
+  --popover-foreground: #09090b;
 
   --primary: #10b981;
-  /* Emerald 500 */
   --primary-foreground: #ffffff;
 
-  --secondary: #f3f4f6;
-  --secondary-foreground: #1f2937;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
 
-  --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
 
-  --accent: #f0fdf4;
-  /* Light emerald tint */
-  --accent-foreground: #166534;
-  /* Emerald 800 */
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
 
   --destructive: #ef4444;
-  --destructive-foreground: #fafafa;
+  --destructive-foreground: #ffffff;
 
-  --border: #e5e7eb;
-  --input: #e5e7eb;
+  --border: #e4e4e7;
+  --input: #e4e4e7;
   --ring: #10b981;
 
+  /* Border Radius - Defined scale */
   --radius: 1rem;
-  /* More rounded */
+  --radius-md: 0.75rem;
+  --radius-sm: 0.5rem;
+  --radius-full: 9999px;
+  /* ← ADDED for circular elements */
+
+  /* ========== MOBILE-FIRST ADDITIONS ========== */
+
+  /* Spacing Scale (Mobile-First) */
+  --space-1: 0.25rem;
+  /* 4px */
+  --space-2: 0.5rem;
+  /* 8px */
+  --space-3: 0.75rem;
+  /* 12px */
+  --space-4: 1rem;
+  /* 16px */
+  --space-5: 1.5rem;
+  /* 24px */
+  --space-6: 2rem;
+  /* 32px */
+  --space-8: 3rem;
+  /* 48px */
+  --space-12: 4rem;
+  /* 64px */
+
+  /* Typography Scale (Mobile-Optimized) */
+  --font-size-xs: 0.75rem;
+  /* 12px - badges only */
+  --font-size-sm: 0.875rem;
+  /* 14px - labels */
+  --font-size-base: 1rem;
+  /* 16px - body */
+  --font-size-lg: 1.125rem;
+  /* 18px - headings */
+  --font-size-xl: 1.25rem;
+  /* 20px - section titles */
+  --font-size-2xl: 1.75rem;
+  /* 28px - page titles */
+  --font-size-hero: 2.5rem;
+  /* 40px - hero numbers */
+
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
 
   /* Charts */
   --chart-1: #10b981;
@@ -48,71 +95,75 @@
   --chart-4: #a7f3d0;
   --chart-5: #d1fae5;
 
-  --sidebar: #ffffff;
-  --sidebar-foreground: #1c1c1e;
+  /* Sidebar */
+  --sidebar: #f4f4f5;
+  --sidebar-foreground: #09090b;
   --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f3f4f6;
-  --sidebar-accent-foreground: #1c1c1e;
-  --sidebar-border: #e5e7eb;
+  --sidebar-accent: #e4e4e7;
+  --sidebar-accent-foreground: #09090b;
+  --sidebar-border: #e4e4e7;
   --sidebar-ring: #10b981;
-
-  /* Functionals */
-  --success: #10b981;
-  --success-foreground: #ffffff;
 }
 
 .dark {
-  /* Dark Mode */
   --background: #09090b;
-  /* 240 5.9% 5% approx */
   --foreground: #fafafa;
 
   --card: #18181b;
-  /* 240 5.9% 10% approx */
   --card-foreground: #fafafa;
 
-  --popover: #27272a;
+  --popover: #18181b;
   --popover-foreground: #fafafa;
 
   --primary: #10b981;
   --primary-foreground: #ffffff;
 
-  --secondary: #3f3f46;
+  --secondary: #27272a;
   --secondary-foreground: #fafafa;
 
-  --muted: #3f3f46;
+  --muted: #27272a;
   --muted-foreground: #a1a1aa;
 
-  --accent: #064e3b;
-  --accent-foreground: #ecfdf5;
+  --accent: #27272a;
+  --accent-foreground: #fafafa;
 
   --destructive: #7f1d1d;
   --destructive-foreground: #fafafa;
 
-  --border: #3f3f46;
-  --input: #3f3f46;
+  --border: #27272a;
+  --input: #27272a;
   --ring: #34d399;
 
+  /* ========== DARK MODE SHADOW ADJUSTMENTS ========== */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5);
+
+  /* Charts */
   --chart-1: #34d399;
   --chart-2: #10b981;
   --chart-3: #059669;
   --chart-4: #047857;
   --chart-5: #065f46;
 
+  /* Sidebar */
   --sidebar: #18181b;
   --sidebar-foreground: #fafafa;
   --sidebar-primary: #10b981;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #3f3f46;
+  --sidebar-accent: #27272a;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #3f3f46;
+  --sidebar-border: #27272a;
   --sidebar-ring: #34d399;
 }
 
 @theme inline {
-  --font-sans: 'Inter', 'Geist', 'sans-serif';
-  --font-mono: 'Geist Mono', 'monospace';
+  /* System Font Stack */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* Color Mapping */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -132,15 +183,15 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+
+  /* Chart Colors */
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+
+  /* Sidebar Colors */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -149,8 +200,12 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
+
+  /* Border Radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
 }
 
 @layer base {
@@ -158,11 +213,81 @@
     @apply border-border outline-ring/50;
   }
 
+  html {
+    /* Mobile-first base font size (min 16px) */
+    font-size: 16px;
+    /* ========== ADDED: Smooth theme transitions ========== */
+    transition: background-color 0.2s ease-in-out;
+  }
+
   body {
-    @apply bg-background text-foreground antialiased;
+    @apply bg-background text-foreground antialiased transition-colors duration-300;
+    /* ========== ADDED: Typography defaults ========== */
+    font-feature-settings: "rlig" 1, "calt" 1;
+    font-size: var(--font-size-base);
+    line-height: var(--leading-normal);
+  }
+
+  /* ========== MOBILE-FIRST TYPOGRAPHY ========== */
+  h1 {
+    font-size: var(--font-size-2xl);
+    font-weight: 600;
+    line-height: var(--leading-tight);
+  }
+
+  h2 {
+    font-size: var(--font-size-xl);
+    font-weight: 600;
+    line-height: var(--leading-tight);
+  }
+
+  h3 {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    line-height: var(--leading-tight);
+  }
+
+  /* ========== PREVENT iOS ZOOM ON INPUT FOCUS ========== */
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
   }
 }
 
-.bg-emerald-gradient {
+/* ========== MOBILE-SPECIFIC UTILITIES ========== */
+@layer utilities {
+
+  /* Tap highlight removal for better mobile UX */
+  .tap-transparent {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Safe area support for notched devices (iPhone 14+) */
+  .safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Smooth scroll for anchor links */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+
+  /* Text balance utility */
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Responsive Utilities (Keep your existing ones) */
+@utility container-query {
+  container-type: inline-size;
+}
+
+@utility bg-emerald-gradient {
   @apply bg-gradient-to-br from-emerald-500 via-emerald-600 to-emerald-700;
 }

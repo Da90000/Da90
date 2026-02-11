@@ -14,23 +14,25 @@ const font = Inter({ subsets: ["latin"], variable: "--font-sans" });
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
+  minimumScale: 1,
   maximumScale: 1,
   userScalable: false,
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#10b981' },
-    { media: '(prefers-color-scheme: dark)', color: '#10b981' },
+    { media: '(prefers-color-scheme: dark)', color: '#059669' },
   ],
 }
 
 export const metadata: Metadata = {
-  title: 'ShopList Pro',
-  description: 'Smart inventory and shopping list management',
+  title: 'Life OS - Mobile-First Dashboard',
+  description: 'Mobile-first personal finance and life management system',
   generator: 'v0.app',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'ShopList Pro',
+    statusBarStyle: 'default',
+    title: 'Life OS',
   },
   formatDetection: {
     telephone: false,
@@ -60,9 +62,15 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={`min-h-screen bg-background font-sans antialiased tracking-tight ${font.variable}`} suppressHydrationWarning>
-        <ThemeProvider disableTransitionOnChange>
+    <html lang="en" suppressHydrationWarning className="tap-transparent smooth-scroll">
+
+      <body className={`min-h-screen bg-background font-sans antialiased tracking-tight touch-manipulation safe-bottom ${font.variable}`} suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange={false}
+        >
           <CurrencyProvider>
             <OfflineSyncProvider>
               {children}

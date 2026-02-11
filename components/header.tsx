@@ -49,35 +49,39 @@ export function Header({ currentView, onViewChange, shoppingListCount }: HeaderP
         onOpenChange={setSearchOpen}
         onNavigate={onViewChange}
       />
-      <header className="sticky top-0 z-40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <header className="sticky top-0 z-40 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between gap-4">
+          <div className="flex h-16 sm:h-14 items-center justify-between gap-2 sm:gap-4">
             {/* Logo */}
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary shadow-sm shadow-primary/20">
-                <ShoppingCart className="h-6 w-6 text-primary-foreground" />
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="flex h-10 w-10 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg bg-primary shadow-sm">
+                <ShoppingCart className="h-5 w-5 sm:h-4 sm:w-4 text-primary-foreground" />
               </div>
-              <span className="text-xl font-bold tracking-tight text-foreground">
-                ShopList Pro
+              <span className="text-lg sm:text-xl font-bold tracking-tight text-foreground truncate">
+                Life OS
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Search Icon (Mobile/Desktop) */}
+            <div className="flex items-center gap-1 sm:gap-2">
+              {/* Search Icon - Larger touch target on mobile */}
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}
-                className="flex h-10 w-10 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                className="flex h-11 w-11 sm:h-10 sm:w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors active:scale-95"
+                aria-label="Search"
               >
-                <Search className="h-6 w-6" />
+                <Search className="h-5 w-5" />
               </button>
 
-              {/* User Dropdown */}
+              {/* User Dropdown - Larger touch target on mobile */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center cursor-pointer shadow-sm ml-2">
+                  <button
+                    className="h-11 w-11 sm:h-10 sm:w-10 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-lg flex items-center justify-center cursor-pointer shadow-sm active:scale-95 transition-transform"
+                    aria-label="User menu"
+                  >
                     <User className="h-5 w-5 text-white" />
-                  </div>
+                  </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" sideOffset={8} className="w-56">
                   {userEmail && (

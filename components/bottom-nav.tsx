@@ -1,185 +1,98 @@
-"use client";
+'use client'
 
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import {
-    Home,
-    Package,
-    ShoppingBag,
-    BookOpen,
-    Menu,
-    CalendarClock,
-    PieChart,
-    Settings,
-    Wrench,
-    LogOut,
-    TrendingDown
-} from "lucide-react";
-import type { ViewMode } from "@/lib/types";
-import { cn } from "@/lib/utils";
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-} from "@/components/ui/sheet";
+import { usePathname } from 'next/navigation'
+import Link from 'next/link'
+import { Home, TrendingUp, PlusCircle, PiggyBank, Menu } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { haptics } from '@/lib/haptics'
 
-interface BottomNavProps {
-    currentView: ViewMode;
-    onViewChange: (view: ViewMode) => void;
-    shoppingListCount: number;
+interface NavItem {
+    name: string
+    href: string
+    icon: React.ComponentType<{ className?: string }>
+    isFAB?: boolean
 }
 
-const PRIMARY_TABS = [
-    { id: "dashboard", label: "Home", icon: Home },
-    { id: "inventory", label: "Inventory", icon: Package },
-    { id: "market", label: "Shop", icon: ShoppingBag },
-    { id: "expenses", label: "Ledger", icon: BookOpen },
-];
+const navigation: NavItem[] = [
+    { name: 'Home', href: '/', icon: Home },
+    { name: 'Spending', href: '/spending', icon: TrendingUp },
+    { name: 'Add', href: '/add', icon: PlusCircle, isFAB: true },
+    { name: 'Budget', href: '/budget', icon: PiggyBank },
+    { name: 'More', href: '/more', icon: Menu },
+]
 
-export function BottomNav({ currentView, onViewChange, shoppingListCount }: BottomNavProps) {
-    const [menuOpen, setMenuOpen] = useState(false);
-    const router = useRouter();
-    const supabase = createClient();
+export function BottomNav() {
+    const pathname = usePathname()
 
-    const handleNavigation = (view: string) => {
-        onViewChange(view as ViewMode);
-        setMenuOpen(false);
-    };
-
-    const handleSignOut = async () => {
-        await supabase.auth.signOut();
-        router.push("/login");
-        router.refresh();
-    };
-
-    // Menu Groups Definition
-    const MENU_GROUPS = [
-        {
-            title: "Financial Tools",
-            items: [
-                { id: "analytics", label: "Analytics", icon: PieChart },
-                { id: "expenses", label: "Ledger", icon: BookOpen },
-                { id: "bills", label: "Bills", icon: CalendarClock },
-            ]
-        },
-        {
-            title: "Asset Management",
-            items: [
-                { id: "maintenance", label: "Maintenance", icon: Wrench },
-                { id: "inventory", label: "Inventory", icon: Package },
-            ]
-        },
-        {
-            title: "System & Account",
-            items: [
-                { id: "settings", label: "Settings", icon: Settings },
-                { id: "logout", label: "Log Out", icon: LogOut, isAction: true, onClick: handleSignOut },
-            ]
-        }
-    ];
+    const handleTap = () => {
+        // Trigger haptic feedback
+        haptics.light()
+    }
 
     return (
-        <>
-            <div className="fixed bottom-0 left-0 right-0 z-50 bg-background border-t border-border pb-safe">
-                <nav className="flex items-center justify-around h-16">
-                    {PRIMARY_TABS.map((tab) => {
-                        const isActive = currentView === tab.id;
+        <nav
+            className={cn(
+                'fixed bottom-0 left-0 right-0 z-50',
+                'bg-background/80 backdrop-blur-lg',
+                'border-t border-border',
+                'safe-bottom',
+                'md:hidden' // Hide on desktop
+            )}
+            role="navigation"
+            aria-label="Main navigation"
+        >
+            <div className="flex items-center justify-around h-16 px-2">
+                {navigation.map((item) => {
+                    const Icon = item.icon
+                    const isActive = pathname === item.href
+                    const isFAB = item.isFAB
+
+                    if (isFAB) {
                         return (
-                            <button
-                                key={tab.id}
-                                onClick={() => onViewChange(tab.id as ViewMode)}
+                            <Link
+                                key={item.name}
+                                href={item.href}
+                                onClick={handleTap}
                                 className={cn(
-                                    "flex flex-col items-center justify-center w-full h-full gap-1",
-                                    isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
+                                    'relative -mt-6',
+                                    'flex flex-col items-center justify-center',
+                                    'w-14 h-14 rounded-full',
+                                    'bg-primary text-primary-foreground',
+                                    'shadow-lg',
+                                    'transition-transform active:scale-95',
+                                    'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2'
                                 )}
+                                aria-label={item.name}
                             >
-                                <div className="relative">
-                                    <tab.icon className={cn("h-6 w-6")} />
-                                    {tab.id === "market" && shoppingListCount > 0 && (
-                                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground">
-                                            {shoppingListCount}
-                                        </span>
-                                    )}
-                                </div>
-                                <span className="text-[10px] font-medium">{tab.label}</span>
-                            </button>
-                        );
-                    })}
+                                <Icon className="h-6 w-6" />
+                            </Link>
+                        )
+                    }
 
-                    <button
-                        onClick={() => setMenuOpen(true)}
-                        className={cn(
-                            "flex flex-col items-center justify-center w-full h-full gap-1",
-                            menuOpen ? "text-primary" : "text-muted-foreground hover:text-foreground"
-                        )}
-                    >
-                        <Menu className="h-6 w-6" />
-                        <span className="text-[10px] font-medium">Menu</span>
-                    </button>
-                </nav>
+                    return (
+                        <Link
+                            key={item.name}
+                            href={item.href}
+                            onClick={handleTap}
+                            className={cn(
+                                'flex flex-col items-center justify-center gap-1',
+                                'min-w-[48px] min-h-[48px]', // WCAG touch target
+                                'rounded-lg px-3 py-2',
+                                'transition-colors',
+                                'focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                                isActive
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground hover:text-foreground'
+                            )}
+                            aria-label={item.name}
+                            aria-current={isActive ? 'page' : undefined}
+                        >
+                            <Icon className={cn('h-5 w-5', isActive && 'fill-current')} />
+                            <span className="text-xs font-medium">{item.name}</span>
+                        </Link>
+                    )
+                })}
             </div>
-
-            <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
-                <SheetContent side="bottom" className="bg-card w-full rounded-t-[1.5rem] border-t border-border/50 max-h-[85vh] overflow-y-auto px-4 pb-8 pt-6">
-                    <SheetHeader className="mb-4 px-2 text-left border-none">
-                        <SheetTitle className="text-xl font-bold text-foreground">Menu</SheetTitle>
-                    </SheetHeader>
-
-                    <div className="space-y-6 px-1">
-                        {MENU_GROUPS.map((group, groupIndex) => (
-                            <div key={groupIndex}>
-                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-3 pl-2 opacity-70">
-                                    {group.title}
-                                </p>
-                                <ul className="space-y-1">
-                                    {group.items.map((item) => {
-                                        const isActive = currentView === item.id;
-                                        const isLogout = item.id === "logout";
-
-                                        return (
-                                            <li key={item.id}>
-                                                <button
-                                                    onClick={() => {
-                                                        // @ts-ignore - Dynamic item handling
-                                                        item.isAction ? item.onClick?.() : handleNavigation(item.id);
-                                                    }}
-                                                    className={cn(
-                                                        "w-full flex items-center gap-3.5 p-3 rounded-xl transition-all duration-200 text-left",
-                                                        isActive && !isLogout && "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 font-medium",
-                                                        !isActive && !isLogout && "hover:bg-muted/50 text-foreground/90 hover:text-foreground",
-                                                        isLogout && "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/20 hover:text-red-600"
-                                                    )}
-                                                >
-                                                    <div className={cn(
-                                                        "w-9 h-9 flex items-center justify-center rounded-lg transition-colors",
-                                                        isActive && !isLogout ? "bg-emerald-500/20" : "bg-muted/30",
-                                                        isLogout && "bg-red-500/10"
-                                                    )}>
-                                                        <item.icon className={cn(
-                                                            "w-5 h-5",
-                                                            isActive && !isLogout ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground",
-                                                            isLogout && "text-current"
-                                                        )} strokeWidth={2} />
-                                                    </div>
-                                                    <span className={cn(
-                                                        "text-sm tracking-tight",
-                                                        isActive ? "font-bold" : "font-medium"
-                                                    )}>
-                                                        {item.label}
-                                                    </span>
-                                                </button>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-                        ))}
-                    </div>
-                </SheetContent>
-            </Sheet>
-        </>
-    );
+        </nav>
+    )
 }
