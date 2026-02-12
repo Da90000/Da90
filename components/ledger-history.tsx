@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useMemo } from "react";
 import { format } from "date-fns";
-import { Plus, CheckCircle2, Receipt, CreditCard, MoreVertical, Pencil, Trash2, TrendingUp, Minus } from "lucide-react";
+import { Plus, CheckCircle2, Receipt, CreditCard, MoreVertical, Pencil, Trash2, TrendingUp, Minus, Target } from "lucide-react";
+import { BudgetView } from "@/components/budget-view";
 import { fetchLedger, addTransaction, addDebtPayment, getTotalPaid, getRemainingAmount, deleteTransaction, updateTransaction, type LedgerEntry, type TransactionType } from "@/lib/ledger-store";
 import { toast } from "@/hooks/use-toast";
 import {
@@ -65,7 +66,7 @@ function formatDate(iso: string): string {
 
 const LEDGER_LOADING_ROWS = 5;
 
-type ViewType = "expenses" | "income" | "debt";
+type ViewType = "expenses" | "income" | "debt" | "budgets";
 
 export function LedgerHistory() {
   const { formatPrice, currencySymbol } = useCurrency();
@@ -201,7 +202,7 @@ export function LedgerHistory() {
     setDebtSaving(true);
     try {
       const { success, error, offline } = await addTransaction({
-        item_name: debtType === "debt_given" ? `Given to ${debtEntity.trim()}` : `Borrowed from ${debtEntity.trim()}`,
+        item_name: debtType === "debt_given" ? `Given to ${debtEntity.trim()} ` : `Borrowed from ${debtEntity.trim()} `,
         category: "Debt",
         amount,
         transaction_type: debtType,
@@ -390,8 +391,8 @@ export function LedgerHistory() {
   const handleDeleteClick = async (transaction: LedgerEntry) => {
     const isDebt = transaction.transaction_type?.startsWith("debt_");
     const confirmMessage = isDebt
-      ? `Delete this debt entry? This will also remove all associated payment records.`
-      : `Delete this transaction?`;
+      ? `Delete this debt entry ? This will also remove all associated payment records.`
+      : `Delete this transaction ? `;
 
     if (!confirm(confirmMessage)) {
       return;
@@ -438,7 +439,7 @@ export function LedgerHistory() {
     try {
       const { success, error, offline } = await addTransaction({
         item_name: data.type.startsWith("debt_")
-          ? (data.debtType === "debt_given" ? `Given to ${data.entityName}` : `Borrowed from ${data.entityName}`)
+          ? (data.debtType === "debt_given" ? `Given to ${data.entityName} ` : `Borrowed from ${data.entityName} `)
           : data.itemName,
         category: data.category,
         amount: data.amount,
@@ -666,8 +667,8 @@ export function LedgerHistory() {
               )}>
                 {isDebt
                   ? isGiven
-                    ? `Given to ${r.entity_name || r.itemName}`
-                    : `Borrowed from ${r.entity_name || r.itemName}`
+                    ? `Given to ${r.entity_name || r.itemName} `
+                    : `Borrowed from ${r.entity_name || r.itemName} `
                   : r.itemName || "—"}
               </p>
             </div>
@@ -754,7 +755,7 @@ export function LedgerHistory() {
             className={cn(
               "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "expenses"
-                ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -766,7 +767,7 @@ export function LedgerHistory() {
             className={cn(
               "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "income"
-                ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
@@ -778,11 +779,23 @@ export function LedgerHistory() {
             className={cn(
               "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
               view === "debt"
-                ? "bg-primary text-primary-foreground text-primary-foreground shadow-sm"
+                ? "bg-primary text-primary-foreground shadow-sm"
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
             Debt
+          </button>
+          <button
+            type="button"
+            onClick={() => setView("budgets")}
+            className={cn(
+              "flex items-center justify-center px-4 py-2 text-sm font-medium rounded-md transition-all min-h-[44px]",
+              view === "budgets"
+                ? "bg-primary text-primary-foreground shadow-sm"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            Budgets
           </button>
         </div>
 
@@ -807,213 +820,165 @@ export function LedgerHistory() {
         )}
       </div>
 
-      {/* Expenses View */}
-      {view === "expenses" && (
-        <div className="space-y-6">
-          <Card className="p-6 mb-6">
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
-              <span className="text-3xl font-bold tracking-tight">{formatPrice(totalExpenses)}</span>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Transaction Ledger</h3>
-            <div>
-              <div className="block space-y-3 md:hidden">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border border-border p-4">
-                      <Skeleton className="mb-2 h-5 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                      <Skeleton className="mt-2 h-5 w-20" />
-                    </div>
-                  ))
-                ) : expensesList.length === 0 ? (
-                  <p className="py-8 text-center text-muted-foreground">No expenses yet</p>
-                ) : (
-                  expensesList.map((r) => (
-                    <TransactionCard
-                      key={r.id}
-                      title={r.itemName || "Expense"}
-                      subtitle={formatDate(r.date)}
-                      amount={r.amount}
-                      category={r.category}
-                      type="expense"
-                      onClick={() => handleEditClick(r)}
-                    />
-                  ))
-                )}
+      <div className="bg-card rounded-xl border shadow-sm overflow-hidden">
+        {loading ? (
+          <div className="p-6 space-y-4">
+            {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 w-full rounded-lg" />)}
+          </div>
+        ) : view === "budgets" ? (
+          <div className="p-4 sm:p-6">
+            <BudgetView />
+          </div>
+        ) : view === "expenses" ? (
+          <div className="space-y-6 p-4 sm:p-6">
+            <Card className="p-6 mb-6">
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Total Expenses</span>
+                <span className="text-3xl font-bold tracking-tight">{formatPrice(totalExpenses)}</span>
               </div>
+            </Card>
 
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="px-4 py-3 w-[150px]">Date</TableHead>
-                      <TableHead className="px-4 py-3">Item Name</TableHead>
-                      <TableHead className="px-4 py-3 w-[150px]">Category</TableHead>
-                      <TableHead className="text-right px-4 py-3 w-[150px]">Amount</TableHead>
-                      <TableHead className="text-right px-4 py-3 w-[50px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      Array.from({ length: LEDGER_LOADING_ROWS }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                        </TableRow>
-                      ))
-                    ) : expensesList.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                          No expenses yet
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      expensesList.map((r) => (
-                        <TableRow key={r.id}>{renderExpenseRow(r)}</TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Income View */}
-      {view === "income" && (
-        <div className="space-y-6">
-          <Card className="p-6 mb-6">
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Total Income</span>
-              <span className="text-3xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">{formatPrice(totalIncome)}</span>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Income History</h3>
-            <div>
-              <div className="block space-y-3 md:hidden">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border border-border p-4">
-                      <Skeleton className="mb-2 h-5 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                      <Skeleton className="mt-2 h-5 w-20" />
-                    </div>
-                  ))
-                ) : incomeList.length === 0 ? (
-                  <p className="py-8 text-center text-muted-foreground">No income recorded yet</p>
-                ) : (
-                  incomeList.map((r) => (
-                    <TransactionCard
-                      key={r.id}
-                      title={r.itemName || "Income"}
-                      subtitle={formatDate(r.date)}
-                      amount={r.amount}
-                      category={r.category}
-                      type="income"
-                      onClick={() => handleEditClick(r)}
-                    />
-                  ))
-                )}
-              </div>
-
-              <div className="hidden md:block">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="px-4 py-3 w-[150px]">Date</TableHead>
-                      <TableHead className="px-4 py-3">Source</TableHead>
-                      <TableHead className="px-4 py-3 w-[150px]">Category</TableHead>
-                      <TableHead className="text-right px-4 py-3 w-[150px]">Amount</TableHead>
-                      <TableHead className="text-right px-4 py-3 w-[50px]">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {loading ? (
-                      Array.from({ length: LEDGER_LOADING_ROWS }).map((_, i) => (
-                        <TableRow key={i}>
-                          <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                          <TableCell><Skeleton className="h-4 w-20" /></TableCell>
-                          <TableCell className="text-right"><Skeleton className="h-4 w-16 ml-auto" /></TableCell>
-                        </TableRow>
-                      ))
-                    ) : incomeList.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">
-                          No income recorded yet
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      incomeList.map((r) => (
-                        <TableRow key={r.id}>{renderIncomeRow(r)}</TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {/* Debt View */}
-      {view === "debt" && (
-        <div className="space-y-6">
-          <Card className="p-6 mb-6">
-            <div className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-muted-foreground">Active Debt</span>
-              <span className={cn(
-                "text-3xl font-bold tracking-tight",
-                totalDebt >= 0 ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"
-              )}>
-                {totalDebt >= 0 ? "-" : "+"}{formatPrice(Math.abs(totalDebt))}
-              </span>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Debt History</h3>
-            <div>
-              <div className="flex flex-col gap-4">
-                {loading ? (
-                  Array.from({ length: 3 }).map((_, i) => (
-                    <div key={i} className="rounded-lg border p-4">
-                      <Skeleton className="mb-2 h-5 w-3/4" />
-                      <Skeleton className="h-4 w-1/2" />
-                      <Skeleton className="mt-2 h-5 w-20" />
-                    </div>
-                  ))
-                ) : debtList.length === 0 ? (
-                  <p className="py-8 text-center text-muted-foreground">No active debts</p>
-                ) : (
-                  debtList.map((r) => renderDebtSmartCard(r))
-                )}
-              </div>
-            </div>
-          </Card>
-
-          {/* Settled Debts Section */}
-          {settledDebtList.length > 0 && (
             <Card className="p-6">
-              <h3 className="text-lg font-semibold text-muted-foreground mb-4">Settled History</h3>
+              <h3 className="text-lg font-semibold mb-4 text-foreground/80">Transaction Ledger</h3>
               <div>
-                <div className="flex flex-col gap-4">
-                  {settledDebtList.map((r) => renderDebtSmartCard(r))}
+                <div className="block space-y-3 md:hidden">
+                  {expensesList.length === 0 ? (
+                    <p className="py-8 text-center text-muted-foreground italic">No expenses recorded yet.</p>
+                  ) : (
+                    expensesList.map((r) => (
+                      <TransactionCard
+                        key={r.id}
+                        title={r.itemName || "Expense"}
+                        subtitle={formatDate(r.date)}
+                        amount={r.amount}
+                        category={r.category}
+                        type="expense"
+                        onClick={() => handleEditClick(r)}
+                      />
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-b">
+                        <TableHead className="px-4 py-3 w-[150px]">Date</TableHead>
+                        <TableHead className="px-4 py-3">Item Name</TableHead>
+                        <TableHead className="px-4 py-3 w-[150px]">Category</TableHead>
+                        <TableHead className="text-right px-4 py-3 w-[150px]">Amount</TableHead>
+                        <TableHead className="text-right px-4 py-3 w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {expensesList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="h-24 text-center text-muted-foreground italic">
+                            No expenses recorded yet.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        expensesList.map((r) => (
+                          <TableRow key={r.id} className="group transition-colors hover:bg-muted/30">
+                            {renderExpenseRow(r)}
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
                 </div>
               </div>
             </Card>
-          )}
-        </div>
-      )}
+          </div>
+        ) : view === "income" ? (
+          <div className="space-y-6 p-4 sm:p-6">
+            <Card className="p-6 mb-6">
+              <div className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-muted-foreground">Total Income</span>
+                <span className="text-3xl font-bold tracking-tight text-emerald-700 dark:text-emerald-400">{formatPrice(totalIncome)}</span>
+              </div>
+            </Card>
+
+            <Card className="p-6">
+              <h3 className="text-lg font-semibold mb-4 text-foreground/80">Income History</h3>
+              <div>
+                <div className="block space-y-3 md:hidden">
+                  {incomeList.length === 0 ? (
+                    <p className="py-8 text-center text-muted-foreground italic">No income recorded yet.</p>
+                  ) : (
+                    incomeList.map((r) => (
+                      <TransactionCard
+                        key={r.id}
+                        title={r.itemName || "Income"}
+                        subtitle={formatDate(r.date)}
+                        amount={r.amount}
+                        category={r.category}
+                        type="income"
+                        onClick={() => handleEditClick(r)}
+                      />
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden md:block">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="hover:bg-transparent border-b">
+                        <TableHead className="px-4 py-3 w-[150px]">Date</TableHead>
+                        <TableHead className="px-4 py-3">Source</TableHead>
+                        <TableHead className="px-4 py-3 w-[150px]">Category</TableHead>
+                        <TableHead className="text-right px-4 py-3 w-[150px]">Amount</TableHead>
+                        <TableHead className="text-right px-4 py-3 w-[50px]"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {incomeList.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="h-24 text-center text-muted-foreground italic">
+                            No income recorded yet.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        incomeList.map((r) => (
+                          <TableRow key={r.id} className="group transition-colors hover:bg-muted/30">
+                            {renderIncomeRow(r)}
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </div>
+            </Card>
+          </div>
+        ) : (
+          <div className="p-4 sm:p-6">
+            <div className="grid gap-6">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {debtList.length === 0 && settledDebtList.length === 0 ? (
+                  <div className="col-span-full py-12 text-center text-muted-foreground italic">
+                    No active debts or lending.
+                  </div>
+                ) : (
+                  <>
+                    {debtList.map(r => renderDebtSmartCard(r))}
+                    {settledDebtList.length > 0 && (
+                      <div className="col-span-full pt-8">
+                        <h3 className="text-xs font-bold text-muted-foreground/60 mb-4 uppercase tracking-[0.2em]">Settled History</h3>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                          {settledDebtList.map(r => renderDebtSmartCard(r))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+
 
       {/* Add Income Dialog */}
       <Dialog open={incomeOpen} onOpenChange={setIncomeOpen}>
@@ -1461,6 +1426,6 @@ export function LedgerHistory() {
 
       {/* Floating Action Button for Mobile */}
       <FloatingActionBtn onClick={handleFabClick} />
-    </div>
+    </div >
   );
 }
